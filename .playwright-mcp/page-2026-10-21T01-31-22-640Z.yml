@@ -1,0 +1,40 @@
+- generic [active] [ref=f1e1]:
+  - banner [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - text: 사건 이름
+      - textbox "사건 이름" [ref=f1e4]:
+        - /placeholder: "예: 미국-이란 호르무즈 사태"
+    - generic [ref=f1e5]:
+      - text: 시작일
+      - textbox "시작일" [ref=f1e6]
+    - generic [ref=f1e7]:
+      - text: 종료일
+      - textbox "종료일" [ref=f1e8]
+    - generic [ref=f1e9]:
+      - text: 주요 인물(쉼표)
+      - textbox "주요 인물(쉼표)" [ref=f1e10]:
+        - /placeholder: 도널드 트럼프, ...
+    - generic [ref=f1e11]:
+      - text: 기관(쉼표)
+      - textbox "기관(쉼표)" [ref=f1e12]:
+        - /placeholder: 혁명수비대, ...
+    - generic [ref=f1e13]:
+      - text: 국가/지역(쉼표)
+      - textbox "국가/지역(쉼표)" [ref=f1e14]:
+        - /placeholder: 미국, 이란
+    - button "실행" [ref=f1e15] [cursor=pointer]
+    - generic [ref=f1e16]:
+      - text: 과거 실행
+      - combobox "과거 실행" [ref=f1e17]:
+        - option "선택"
+        - option "미국-이란 호르무즈 사태 · 2026-06-24~2026-07-02 · done" [selected]
+  - main [ref=f1e19]:
+    - complementary [ref=f1e25]:
+      - heading "타임라인" [level=3] [ref=f1e26]
+      - generic [ref=f1e27]:
+        - slider [ref=f1e28]: "0"
+        - slider [ref=f1e29]: "0"
+      - list
+    - generic [ref=f1e30]:
+      - heading "상세" [level=3] [ref=f1e31]
+      - generic [ref=f1e32]: 노드·간선·사건을 클릭하면 근거가 표시됩니다.

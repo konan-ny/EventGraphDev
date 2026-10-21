@@ -1,2 +1,174 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><title>EventGraph</title></head><body>EventGraph (UI in Task 11)</body></html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EventGraph</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.4/cytoscape.min.js"></script>
+<style>
+  :root { --bg:#fff; --fg:#1b1b1b; --muted:#666; --line:#ddd; --panel:#f6f6f8; --accent:#2b6cb0; --hl:#e53e3e; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 14px/1.45 system-ui, "Malgun Gothic", sans-serif; color:var(--fg); background:var(--bg); }
+  header { padding:10px 16px; border-bottom:1px solid var(--line); display:flex; gap:8px; flex-wrap:wrap; align-items:end; }
+  header label { display:flex; flex-direction:column; font-size:12px; color:var(--muted); }
+  header input, header select { padding:5px 7px; border:1px solid var(--line); border-radius:4px; font:inherit; min-width:120px; }
+  header input.wide { min-width:220px; }
+  button { padding:6px 12px; border:1px solid var(--accent); background:var(--accent); color:#fff; border-radius:4px; cursor:pointer; font:inherit; }
+  button:disabled { opacity:.5; cursor:default; }
+  #status { width:100%; font-size:13px; color:var(--muted); min-height:18px; }
+  main { display:grid; grid-template-columns: 7fr 3fr; grid-template-rows: minmax(360px, 60vh) auto; gap:0; }
+  #cy { border-right:1px solid var(--line); min-height:360px; }
+  aside { padding:10px 12px; overflow:auto; max-height:60vh; }
+  aside h3, #detail h3 { margin:0 0 6px; font-size:13px; color:var(--muted); font-weight:600; }
+  .range { display:flex; gap:6px; align-items:center; font-size:12px; margin-bottom:8px; }
+  .range input[type=range] { flex:1; }
+  ul.timeline { list-style:none; margin:0; padding:0; }
+  ul.timeline li { padding:6px 8px; border-left:3px solid var(--line); margin-bottom:4px; cursor:pointer; background:var(--panel); border-radius:0 4px 4px 0; }
+  ul.timeline li:hover, ul.timeline li.active { border-left-color:var(--accent); }
+  ul.timeline .d { font-weight:600; font-size:12px; color:var(--accent); }
+  ul.timeline .n { color:var(--muted); font-size:12px; }
+  #detail { grid-column: 1 / -1; border-top:1px solid var(--line); padding:10px 16px; min-height:120px; }
+  #detail .ev { padding:6px 0; border-bottom:1px dashed var(--line); }
+  #detail .src { color:var(--muted); font-size:12px; }
+  #detail a { color:var(--accent); }
+  .tag { display:inline-block; padding:1px 6px; border-radius:10px; background:var(--panel); font-size:12px; margin-right:4px; }
+  @media (max-width: 800px) { main { grid-template-columns:1fr; } #cy { border-right:0; border-bottom:1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header>
+  <label>사건 이름 <input id="event" class="wide" placeholder="예: 미국-이란 호르무즈 사태"></label>
+  <label>시작일 <input id="from" type="date"></label>
+  <label>종료일 <input id="to" type="date"></label>
+  <label>주요 인물(쉼표) <input id="persons" class="wide" placeholder="도널드 트럼프, ..."></label>
+  <label>기관(쉼표) <input id="orgs" placeholder="혁명수비대, ..."></label>
+  <label>국가/지역(쉼표) <input id="countries" placeholder="미국, 이란"></label>
+  <button id="go">실행</button>
+  <label>과거 실행 <select id="runs"></select></label>
+  <div id="status"></div>
+</header>
+<main>
+  <div id="cy"></div>
+  <aside>
+    <h3>타임라인</h3>
+    <div class="range">
+      <span id="r1"></span><input id="s1" type="range" min="0" max="0" value="0"><input id="s2" type="range" min="0" max="0" value="0"><span id="r2"></span>
+    </div>
+    <ul id="timeline" class="timeline"></ul>
+  </aside>
+  <section id="detail"><h3>상세</h3><div id="detail-body">노드·간선·사건을 클릭하면 근거가 표시됩니다.</div></section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const api = async (p, opt) => { const r = await fetch(p, opt); if (!r.ok) throw new Error((await r.json()).detail || r.status); return r.json(); };
+const csv = (s) => s.split(",").map(x => x.trim()).filter(Boolean);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let runId = null, days = [], poll = null;
+
+const SHAPE = { PERSON: "ellipse", ORG: "round-rectangle", COUNTRY: "hexagon", LOCATION: "diamond" };
+const COLOR = { PERSON: "#2b6cb0", ORG: "#6b46c1", COUNTRY: "#2f855a", LOCATION: "#b7791f" };
+const cy = cytoscape({
+  container: $("cy"),
+  style: [
+    { selector: "node", style: { label: "data(label)", "text-wrap": "wrap", "text-max-width": 120, "font-size": 11,
+        "text-valign": "bottom", "text-margin-y": 4, width: "data(size)", height: "data(size)",
+        shape: (n) => SHAPE[n.data("type")] || "ellipse", "background-color": (n) => COLOR[n.data("type")] || "#888" } },
+    { selector: "edge", style: { label: "data(label)", "font-size": 9, color: "#555", "curve-style": "bezier",
+        "target-arrow-shape": "triangle", width: "data(w)", "line-color": "#aaa", "target-arrow-color": "#aaa",
+        "text-rotation": "autorotate", "text-background-color": "#fff", "text-background-opacity": .8, "text-background-padding": 1 } },
+    { selector: ".highlight", style: { "border-width": 4, "border-color": "#e53e3e" } },
+    { selector: ".dim", style: { opacity: .25 } },
+  ],
+});
+
+async function loadRuns(selectId) {
+  const runs = await api("/runs");
+  $("runs").innerHTML = '<option value="">선택</option>' + runs.map(r =>
+    `<option value="${esc(r.id)}">${esc(r.event_name)} · ${r.date_from}~${r.date_to} · ${esc(r.status)}</option>`).join("");
+  if (selectId) $("runs").value = selectId;
+}
+
+$("go").onclick = async () => {
+  const body = { event_name: $("event").value.trim(), date_from: $("from").value, date_to: $("to").value,
+    seed_persons: csv($("persons").value), seed_orgs: csv($("orgs").value), seed_countries: csv($("countries").value) };
+  if (!body.event_name || !body.date_from || !body.date_to) { $("status").textContent = "사건 이름과 기간은 필수입니다."; return; }
+  $("go").disabled = true;
+  try { const r = await api("/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        await loadRuns(r.run_id); watch(r.run_id); }
+  catch (e) { $("status").textContent = "실행 실패: " + e.message; $("go").disabled = false; }
+};
+$("runs").onchange = () => { if ($("runs").value) watch($("runs").value); };
+
+async function watch(id) {
+  runId = id; clearInterval(poll);
+  const tick = async () => {
+    const r = await api(`/runs/${id}`);
+    const stage = { created: "대기", selecting: "선별 중", extracting: `추출 ${r.doc_extracted + r.doc_failed}/${r.doc_selected}` + (r.doc_failed ? ` (실패 ${r.doc_failed})` : ""),
+                    batching: "배치(Spark) 중", done: "완료", failed: "실패" }[r.status] || r.status;
+    $("status").textContent = `${r.event_name} · 선별 ${r.doc_selected}건 → ${stage}` + (r.error ? ` · ${r.error}` : "") +
+      (r.expanded_keywords?.length ? ` · 키워드: ${r.expanded_keywords.slice(0, 12).join(", ")}` : "");
+    if (r.status === "done" || r.status === "failed") { clearInterval(poll); $("go").disabled = false; if (r.status === "done") await render(); }
+  };
+  await tick(); poll = setInterval(tick, 2000);
+}
+
+function dayRange(from, to) { const out = []; for (let d = new Date(from); d <= new Date(to); d.setDate(d.getDate() + 1)) out.push(d.toISOString().slice(0, 10)); return out; }
+
+async function render() {
+  const r = await api(`/runs/${runId}`);
+  days = dayRange(r.date_from, r.date_to);
+  $("s1").max = $("s2").max = days.length - 1; $("s1").value = 0; $("s2").value = days.length - 1;
+  await refresh();
+}
+$("s1").oninput = $("s2").oninput = () => { if (+$("s1").value > +$("s2").value) { const t = $("s1").value; $("s1").value = $("s2").value; $("s2").value = t; } refresh(); };
+
+async function refresh() {
+  const from = days[+$("s1").value], to = days[+$("s2").value];
+  $("r1").textContent = from; $("r2").textContent = to;
+  const q = `?from=${from}&to=${to}`;
+  const [g, ev] = await Promise.all([api(`/runs/${runId}/graph${q}`), api(`/runs/${runId}/events${q}`)]);
+  cy.elements().remove();
+  cy.add(g.nodes.map(n => ({ data: { id: "n" + n.id, eid: n.id, type: n.type, size: 18 + Math.min(40, 4 * n.degree),
+    label: n.name + (n.type === "PERSON" && n.affiliations.length ? "\n" + n.affiliations.slice(0, 2).map(a => a.name).join("·") : "") } })));
+  cy.add(g.edges.map(e => ({ data: { id: "e" + e.id, rid: e.id, source: "n" + e.src, target: "n" + e.dst,
+    label: e.type === "OTHER" ? e.raw_label : e.type, w: 1 + Math.log2(e.doc_count) } })));
+  cy.layout({ name: "cose", animate: false, nodeRepulsion: 9000, idealEdgeLength: 90 }).run();
+  $("timeline").innerHTML = ev.map(e => `<li data-id="${e.id}" data-p="${e.participants.map(p => p.id).join(",")}">
+    <div class="d">${e.date ?? "날짜 미상"} <span class="n">· 기사 ${e.doc_count}건</span></div>${esc(e.summary)}
+    <div class="n">${esc(e.participants.map(p => p.name).join(", "))}${e.location ? " @ " + esc(e.location) : ""}</div></li>`).join("") || "<li>이 기간의 사건이 없습니다.</li>";
+  $("detail-body").textContent = `노드 ${g.nodes.length} · 간선 ${g.edges.length} · 사건 ${ev.length}`;
+}
+
+$("timeline").onclick = async (e) => {
+  const li = e.target.closest("li[data-id]"); if (!li) return;
+  document.querySelectorAll("#timeline li").forEach(x => x.classList.toggle("active", x === li));
+  const ids = new Set(li.dataset.p.split(",").filter(Boolean).map(x => "n" + x));
+  cy.elements().removeClass("highlight dim");
+  cy.nodes().forEach(n => n.addClass(ids.has(n.id()) ? "highlight" : "dim"));
+  cy.edges().addClass("dim");
+  const ev = await api(`/runs/${runId}/events/${li.dataset.id}/evidence`);
+  $("detail-body").innerHTML = `<b>사건</b> ${esc(li.querySelector(".d").textContent)}<br>` + evidenceHtml(ev);
+};
+
+const evidenceHtml = (ev) => ev.map(v => `<div class="ev">${esc(v.sentence)}<div class="src">${v.evidence_date ? v.evidence_date + " · " : ""}` +
+  `<a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.title)}</a> · ${esc(v.press)} · ${String(v.writedate).slice(0, 10)}</div></div>`).join("") || "근거 없음";
+
+cy.on("tap", "node", async (e) => {
+  cy.elements().removeClass("highlight dim"); e.target.addClass("highlight");
+  const d = await api(`/runs/${runId}/entities/${e.target.data("eid")}`);
+  $("detail-body").innerHTML = `<b>${esc(d.name)}</b> <span class="tag">${d.type}</span> 기사 ${d.doc_count}건 · 연결 ${d.degree}<br>` +
+    `<div>별칭: ${d.surface_forms.map(esc).join(", ") || "-"}</div>` +
+    `<div>소속: ${d.affiliations.map(a => `${esc(a.name)}${a.role ? "(" + esc(a.role) + ")" : ""}${a.is_primary ? "★" : ""}`).join(", ") || "-"}</div>` +
+    `<div>관련 사건: ${d.events.map(x => `${x.date ?? "?"} ${esc(x.summary)}`).join(" / ") || "-"}</div>`;
+});
+cy.on("tap", "edge", async (e) => {
+  cy.elements().removeClass("highlight dim"); e.target.addClass("highlight");
+  const ev = await api(`/runs/${runId}/relations/${e.target.data("rid")}/evidence`);
+  $("detail-body").innerHTML = `<b>${esc(e.target.source().data("label").split("\n")[0])} → ${esc(e.target.target().data("label").split("\n")[0])}</b> <span class="tag">${esc(e.target.data("label"))}</span><br>` + evidenceHtml(ev);
+});
+cy.on("tap", (e) => { if (e.target === cy) cy.elements().removeClass("highlight dim"); });
+
+loadRuns().then(() => { const first = $("runs").options[1]; if (first) { $("runs").value = first.value; watch(first.value); } });
+</script>
+</body>
+</html>
