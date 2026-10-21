@@ -50,6 +50,13 @@ _PAREN = re.compile(r"\([^)]*\)|（[^）]*）|\[[^\]]*\]")
 _SPACE = re.compile(r"\s+")
 
 
+def name_tokens(name_ko: str) -> list[str]:
+    """Whitespace tokens minus title tokens ('트럼프 대통령' -> ['트럼프']); never empty."""
+    toks = (name_ko or "").split()
+    kept = [t for t in toks if t not in TITLE_SUFFIXES]
+    return kept or toks
+
+
 def norm_key(type: str, name_ko: str) -> str:
     base = _SPACE.sub("", _PAREN.sub("", name_ko or "")).lower()
     if type != "PERSON":

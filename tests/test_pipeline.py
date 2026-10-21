@@ -115,3 +115,49 @@ def test_get_active_run(settings, pg):
     )
     pg.execute("update run set status='extracting' where id=%s", (rid,))
     assert get_active_run(settings) == rid
+
+
+@pytest.mark.integration
+def test_run_fails_when_every_extraction_fails(settings, pg, tmp_path):
+    from eventgraph.extract.client import ExtractionError
+
+    s = replace(settings, data_dir=tmp_path, max_docs=3)
+    rid = create_run(
+        s, "호르무즈", date(2026, 6, 27), date(2026, 6, 27), [], [], [], id_prefix="test-"
+    )
+
+    def bad(*a, **k):
+        raise ExtractionError("bad json")
+
+    with pytest.raises(RuntimeError, match="0"):
+        run_pipeline(s, rid, client=FakeClient(), extract_fn=bad)
+    row = pg.execute("select status, doc_failed from run where id=%s", (rid,)).fetchone()
+    assert row == ("failed", 3)
+    assert pg.execute("select count(*) from entity where run_id=%s", (rid,)).fetchone()[0] == 0
+
+
+@pytest.mark.integration
+def test_run_reports_progress_on_run_row(settings, pg, tmp_path):
+    seen = []
+
+    def fake(client, model, doc, event_name, seeds):
+        seen.append(
+            pg.execute(
+                "select doc_extracted from run where id like 'test-%%' order by started_at desc limit 1"
+            ).fetchone()[0]
+        )
+        return Extraction(), {"tokens_in": 1, "tokens_out": 1, "elapsed_ms": 0}
+
+    s = replace(settings, data_dir=tmp_path, max_docs=12, llm_concurrency=1)
+    rid = create_run(
+        s, "호르무즈", date(2026, 6, 27), date(2026, 6, 27), [], [], [], id_prefix="test-"
+    )
+    run_pipeline(s, rid, stages=("select", "extract"), client=FakeClient(), extract_fn=fake)
+    assert max(seen) >= 10  # progress was written to the run row before extraction finished
+
+
+def test_created_run_counts_as_active(settings, pg):
+    rid = create_run(
+        settings, "x", date(2026, 6, 27), date(2026, 6, 27), [], [], [], id_prefix="test-"
+    )
+    assert get_active_run(settings) == rid

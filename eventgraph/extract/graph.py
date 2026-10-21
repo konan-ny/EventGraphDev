@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from collections.abc import Callable
 from typing import Any, TypedDict
 
@@ -123,6 +124,7 @@ def run_extraction(
 
     ok = [s for s in states if s.get("extraction_json") is not None]
     bad = [s for s in states if s.get("extraction_json") is None]
+    stamp = str(time.time_ns())  # reruns must not overwrite earlier parts
     for i in range(0, len(ok), PARQUET_BATCH):
         chunk = ok[i : i + PARQUET_BATCH]
         table = pa.table(
@@ -134,7 +136,9 @@ def run_extraction(
                 "elapsed_ms": pa.array([s["meta"]["elapsed_ms"] for s in chunk], pa.int64()),
             }
         )
-        pq.write_table(table, out_dir / "extracted" / f"part-{i // PARQUET_BATCH:05d}.parquet")
+        pq.write_table(
+            table, out_dir / "extracted" / f"part-{stamp}-{i // PARQUET_BATCH:05d}.parquet"
+        )
     with (out_dir / "failed.jsonl").open("w", encoding="utf-8") as f:
         for s in bad:
             f.write(

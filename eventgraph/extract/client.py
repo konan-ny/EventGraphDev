@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 
 from pydantic import ValidationError
 
 from ..source import Doc
+from .dates import resolve_date
 from .models import OUTPUT_SCHEMA, Extraction
 from .prompt import SYSTEM_PROMPT, build_user_message
 
@@ -46,9 +48,22 @@ def extract_document(
         raise ExtractionError(f"stop_reason={resp.stop_reason}")
     text = "".join(getattr(b, "text", "") for b in resp.content if getattr(b, "type", "") == "text")
     try:
-        extraction = Extraction.model_validate_json(_json_slice(text))
+        data = json.loads(_json_slice(text))
+    except ValueError as e:
+        raise ExtractionError(f"json: {e}") from e
+    _resolve_dates(data, doc.writedate.date())
+    try:
+        extraction = Extraction.model_validate(data)
     except ValidationError as e:
         raise ExtractionError(f"schema: {e.errors()[:3]}") from e
-    except ValueError as e:  # json decode errors are ValueError subclasses
-        raise ExtractionError(f"json: {e}") from e
     return extraction, meta
+
+
+def _resolve_dates(data: dict, base) -> None:
+    """'지난 24일' / '6월 25일' style strings -> ISO using the article date; else untouched."""
+    for r in data.get("relations") or []:
+        if isinstance(r, dict) and isinstance(r.get("evidence_date"), str):
+            r["evidence_date"] = str(resolve_date(r["evidence_date"], base) or r["evidence_date"])
+    for ev in data.get("events") or []:
+        if isinstance(ev, dict) and isinstance(ev.get("date"), str):
+            ev["date"] = str(resolve_date(ev["date"], base) or ev["date"])

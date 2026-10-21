@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 
@@ -13,10 +14,29 @@ from pydantic import BaseModel, Field, model_validator
 
 from .config import Settings, load_settings
 from .db import pg_connect
-from .pipeline import create_run, get_active_run, run_pipeline
+from .migrate import migrate
+from .pipeline import ACTIVE, create_run, get_active_run, run_pipeline
 
 log = logging.getLogger(__name__)
-app = FastAPI(title="EventGraph")
+
+
+@asynccontextmanager
+async def _lifespan(_: FastAPI):
+    s = _settings()
+    migrate(s)
+    with pg_connect(s) as conn:  # a run left active by a crashed server would block every POST
+        n = conn.execute(
+            "update run set status='failed', error='interrupted by server restart',"
+            " finished_at=now() where status = any(%s)",
+            (list(ACTIVE),),
+        ).rowcount
+        conn.commit()
+    if n:
+        log.warning("marked %d interrupted run(s) as failed on startup", n)
+    yield
+
+
+app = FastAPI(title="EventGraph", lifespan=_lifespan)
 STATIC = Path(__file__).with_name("static")
 SETTINGS: Settings | None = None  # tests inject one; otherwise loaded from config/.env
 
@@ -64,18 +84,22 @@ def index() -> FileResponse:
 @app.post("/runs", status_code=201)
 def post_run(req: RunRequest, bg: BackgroundTasks) -> dict:
     s = _settings()
-    active = get_active_run(s)
-    if active:
-        raise HTTPException(409, f"run {active} is still in progress")
-    rid = create_run(
-        s,
-        req.event_name,
-        req.date_from,
-        req.date_to,
-        req.seed_persons,
-        req.seed_orgs,
-        req.seed_countries,
-    )
+    with pg_connect(s) as conn:  # serialize check+insert so two requests cannot both pass
+        conn.execute("select pg_advisory_xact_lock(7421)")
+        active = get_active_run(s)
+        if active:
+            conn.rollback()
+            raise HTTPException(409, f"run {active} is still in progress")
+        rid = create_run(
+            s,
+            req.event_name,
+            req.date_from,
+            req.date_to,
+            req.seed_persons,
+            req.seed_orgs,
+            req.seed_countries,
+        )
+        conn.commit()
     bg.add_task(_background_run, s, rid)
     return {"run_id": rid}
 
@@ -108,13 +132,16 @@ _TO = Query(None, alias="to")
 
 
 def _edge_period(from_: date | None, to: date | None) -> tuple[str, tuple]:
-    """Edge visible when its evidence-date range overlaps [from, to]."""
+    """Edge visible when at least one piece of evidence is dated inside [from, to]
+    (evidence_date, else the article date) — spec 4.3, not range overlap."""
     if from_ is None and to is None:
         return "", ()
-    return (
-        " and coalesce(r.date_max, r.date_min) >= %s and coalesce(r.date_min, r.date_max) <= %s",
-        (from_ or date.min, to or date.max),
+    cond = (
+        " and exists (select 1 from evidence v join run_document d on d.id = v.run_document_id"
+        " where v.relation_id = r.id"
+        " and coalesce(v.evidence_date, cast(d.writedate as date)) between %s and %s)"
     )
+    return cond, (from_ or date.min, to or date.max)
 
 
 @app.get("/runs/{run_id}/graph")

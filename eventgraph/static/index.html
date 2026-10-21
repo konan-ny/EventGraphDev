@@ -104,12 +104,13 @@ async function watch(id) {
   const tick = async () => {
     const r = await api(`/runs/${id}`);
     const stage = { created: "대기", selecting: "선별 중", extracting: `추출 ${r.doc_extracted + r.doc_failed}/${r.doc_selected}` + (r.doc_failed ? ` (실패 ${r.doc_failed})` : ""),
-                    batching: "배치(Spark) 중", done: "완료", failed: "실패" }[r.status] || r.status;
+                    batching: "배치(Spark) 중", done: "완료" + (r.doc_failed ? ` (추출 실패 ${r.doc_failed}건)` : ""), failed: "실패" }[r.status] || r.status;
     $("status").textContent = `${r.event_name} · 선별 ${r.doc_selected}건 → ${stage}` + (r.error ? ` · ${r.error}` : "") +
       (r.expanded_keywords?.length ? ` · 키워드: ${r.expanded_keywords.slice(0, 12).join(", ")}` : "");
     if (r.status === "done" || r.status === "failed") { clearInterval(poll); $("go").disabled = false; if (r.status === "done") await render(); }
   };
-  await tick(); poll = setInterval(tick, 2000);
+  const safe = () => tick().catch(e => { $("status").textContent = "상태 조회 실패: " + e.message; });
+  await safe(); poll = setInterval(safe, 2000);
 }
 
 function dayRange(from, to) { const out = []; for (let d = new Date(from); d <= new Date(to); d.setDate(d.getDate() + 1)) out.push(d.toISOString().slice(0, 10)); return out; }

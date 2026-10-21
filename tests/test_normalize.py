@@ -1,6 +1,6 @@
 import pytest
 
-from eventgraph.batch.normalize import norm_key
+from eventgraph.batch.normalize import name_tokens, norm_key
 
 
 @pytest.mark.parametrize(
@@ -20,3 +20,9 @@ from eventgraph.batch.normalize import norm_key
 )
 def test_norm_key(t, n, exp):
     assert norm_key(t, n) == exp
+
+
+def test_name_tokens_drops_title_tokens():
+    assert name_tokens("트럼프 대통령") == ["트럼프"]
+    assert name_tokens("아바스 아락치 외무장관") == ["아바스", "아락치"]
+    assert name_tokens("대통령") == ["대통령"]  # never empty

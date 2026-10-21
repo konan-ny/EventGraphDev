@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +45,17 @@ class Entity(BaseModel):
     affiliations: list[Affiliation] = Field(default_factory=list)
 
 
+def _lenient_date(v):
+    """Unparseable date strings become None instead of failing the whole document."""
+    if v is None or isinstance(v, dt.date):
+        return v
+    try:
+        return dt.date.fromisoformat(str(v).strip())
+    except ValueError:
+        log.warning("dropping unparseable date %r", v)
+        return None
+
+
 class Relation(BaseModel):
     src_temp_id: str
     dst_temp_id: str
@@ -53,6 +64,8 @@ class Relation(BaseModel):
     evidence: str
     evidence_date: dt.date | None = None
 
+    _date = field_validator("evidence_date", mode="before")(_lenient_date)
+
 
 class Event(BaseModel):
     date: dt.date | None = None  # field name shadows the type, hence dt.date
@@ -60,6 +73,8 @@ class Event(BaseModel):
     participants: list[str] = Field(default_factory=list)
     location_temp_id: str | None = None
     evidence: str
+
+    _date = field_validator("date", mode="before")(_lenient_date)
 
 
 class Extraction(BaseModel):

@@ -2,9 +2,9 @@ from eventgraph.batch.job import canonical_keys
 
 
 def _row(typ, name, aliases=()):
-    from eventgraph.batch.normalize import norm_key
+    from eventgraph.batch.normalize import name_tokens, norm_key
 
-    return (typ, norm_key(typ, name), [norm_key(typ, a) for a in aliases], name.split())
+    return (typ, norm_key(typ, name), [norm_key(typ, a) for a in aliases], name_tokens(name))
 
 
 def test_single_token_surname_merges_into_unique_full_name():
@@ -60,3 +60,8 @@ def test_honorific_prefixed_variant_merges():
         [_row("PERSON", "세예드 아바스 아라그치"), _row("PERSON", "압바스 아라그치")]
     )
     assert len(set(canon.values())) == 1
+
+
+def test_title_suffixed_mention_merges_into_full_name():
+    canon = canonical_keys([_row("PERSON", "도널드 트럼프"), _row("PERSON", "트럼프 대통령")])
+    assert canon[("PERSON", "트럼프")] == "도널드트럼프"

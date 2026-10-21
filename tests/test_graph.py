@@ -91,3 +91,16 @@ def test_run_extraction_reports_progress(settings, pg, tmp_path, sample_docs):
         progress_cb=lambda d, t: seen.append((d, t)),
     )
     assert seen[-1] == (5, 5) and len(seen) == 5
+
+
+@pytest.mark.integration
+def test_run_extraction_rerun_keeps_previous_parquet(settings, pg, tmp_path, sample_docs):
+    rid, docs = sample_docs
+
+    def fake(client, model, doc, event_name, seeds):
+        return Extraction(), {"tokens_in": 1, "tokens_out": 1, "elapsed_ms": 0}
+
+    s = replace(settings, data_dir=tmp_path)
+    run_extraction(s, rid, docs[:3], "ev", [], None, fake)
+    run_extraction(s, rid, docs[3:], "ev", [], None, fake)
+    assert pq.read_table(tmp_path / "runs" / rid / "extracted").num_rows == 5

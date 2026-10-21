@@ -30,3 +30,19 @@ def test_fetch_candidates_excludes_bad_rows(settings):
     assert {"excluded_bad_date", "excluded_empty_body"} <= stats.keys()
     assert all(d.writedate.year == 2026 and d.body and d.press for d in docs[:50])
     assert all(d.writedate.date() == date(2026, 6, 24) for d in docs)
+
+
+def test_clean_body_keeps_line_breaks_for_block_tags_and_unescapes_entities():
+    out = clean_body("첫 문장이다.<br>둘째 문장이다.<p>셋째</p>&nbsp;&quot;넷째&quot;")
+    assert out.splitlines() == ["첫 문장이다.", "둘째 문장이다.", "셋째", '"넷째"']
+
+
+@pytest.mark.integration
+def test_fetch_candidates_counts_bad_dates_table_wide(settings):
+    from eventgraph.db import mysql_connect
+
+    with mysql_connect(settings) as conn, conn.cursor() as cur:
+        cur.execute(f"select count(*) n from `{settings.db_table}` where writedate <= '1900-01-01'")
+        expected = cur.fetchone()["n"]
+    _, stats = fetch_candidates(settings, date(2026, 6, 24), date(2026, 6, 24))
+    assert stats["excluded_bad_date"] == expected > 0

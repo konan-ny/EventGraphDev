@@ -60,3 +60,24 @@ def test_unknown_entity_type_dropped_with_its_relations():
         }
     )
     assert [e.temp_id for e in x.entities] == ["e1"] and x.relations == [] and x.dropped == 1
+
+
+def test_unparseable_dates_become_none_not_fatal():
+    x = Extraction.model_validate(
+        {
+            "entities": _ents(),
+            "relations": [
+                {
+                    "src_temp_id": "e1",
+                    "dst_temp_id": "e2",
+                    "type": "MEETS",
+                    "evidence": "x",
+                    "evidence_date": "2026-06",
+                }
+            ],
+            "events": [
+                {"date": "지난 24일", "summary_ko": "s", "participants": [], "evidence": "x"}
+            ],
+        }
+    )
+    assert x.relations[0].evidence_date is None and x.events[0].date is None

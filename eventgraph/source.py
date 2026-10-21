@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import logging
 import re
 from dataclasses import dataclass
@@ -15,7 +16,7 @@ log = logging.getLogger(__name__)
 
 _TAG = re.compile(r"<[^<>]{1,80}>")  # html tags and broadcast cues like <앵커>, <기자>
 # tags that end a line (block tags, broadcast cues like <앵커>) vs inline ones (<b>, <a>)
-_BREAKING = re.compile(r"^</?(br|p|div|li|h\d|tr)(?![a-z])|[가-힣]", re.IGNORECASE)
+_BREAKING = re.compile(r"^/?(br|p|div|li|h\d|tr)(?![a-z])|[가-힣]", re.IGNORECASE)
 _SPACES = re.compile(r"[ \t\u3000]+")
 _BLANK_LINES = re.compile(r"\n\s*\n+")
 _HOST_PREFIX = re.compile(r"^(www|news|m|mnews)\.")
@@ -34,6 +35,7 @@ class Doc:
 
 def clean_body(raw: str) -> str:
     s = _TAG.sub(lambda m: "\n" if _BREAKING.search(m.group(0)[1:]) else "", raw or "")
+    s = html.unescape(s)
     s = _SPACES.sub(" ", s)
     s = "\n".join(line.strip() for line in s.splitlines())
     s = _BLANK_LINES.sub("\n", s)
@@ -50,14 +52,15 @@ def fetch_candidates(settings: Settings, date_from: date, date_to: date) -> tupl
     lo, hi = date_from.isoformat(), (date_to + timedelta(days=1)).isoformat()
     base = f"FROM `{t}` WHERE writedate >= %s AND writedate < %s"
     with mysql_connect(settings) as conn, conn.cursor() as cur:
+        # bad dates cannot fall inside the range by definition: count them table-wide
         cur.execute(
-            f"SELECT SUM(writedate <= '1900-01-01') bad_date, SUM(body IS NULL OR body = '') empty_body {base}",
-            (lo, hi),
+            f"SELECT COUNT(*) n FROM `{t}` WHERE writedate IS NULL OR writedate <= '1900-01-01'"
         )
-        r = cur.fetchone()
+        bad = int(cur.fetchone()["n"])
+        cur.execute(f"SELECT SUM(body IS NULL OR body = '') empty_body {base}", (lo, hi))
         stats = {
-            "excluded_bad_date": int(r["bad_date"] or 0),
-            "excluded_empty_body": int(r["empty_body"] or 0),
+            "excluded_bad_date": bad,
+            "excluded_empty_body": int(cur.fetchone()["empty_body"] or 0),
         }
         cur.execute(
             f"SELECT idx, title, body, writedate, url, url2 {base} AND writedate > '1900-01-01' AND body IS NOT NULL AND body <> ''",

@@ -40,3 +40,12 @@ def test_extract_document_raises_on_non_json():
 def test_extract_document_raises_on_truncation():
     with pytest.raises(ExtractionError, match="max_tokens"):
         extract_document(_client('{"entities":[', stop="max_tokens"), "m", DOC, "ev", [])
+
+
+def test_extract_document_resolves_relative_dates_against_article_date():
+    text = (
+        '{"entities":[{"temp_id":"e1","type":"COUNTRY","name_ko":"이란"}],"relations":[],'
+        '"events":[{"date":"지난 24일","summary_ko":"s","participants":["e1"],"location_temp_id":null,"evidence":"x"}]}'
+    )
+    x, _ = extract_document(_client(text), "m", DOC, "ev", [])  # DOC.writedate = 2026-06-27
+    assert str(x.events[0].date) == "2026-06-24"

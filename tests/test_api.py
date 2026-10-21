@@ -102,3 +102,23 @@ def test_post_run_validates_dates(client_with_fixture):
 def test_index_served(client_with_fixture):
     r = client_with_fixture.get("/")
     assert r.status_code == 200 and "<html" in r.text.lower()
+
+
+@pytest.mark.integration
+def test_graph_period_filter_uses_evidence_dates_not_range_overlap(client_with_fixture):
+    # CRITICIZES evidence dates are 06-25 and 06-27; nothing on 06-26
+    g = client_with_fixture.get(
+        f"/runs/{RID}/graph", params={"from": "2026-06-26", "to": "2026-06-26"}
+    ).json()
+    assert g["edges"] == []
+
+
+@pytest.mark.integration
+def test_startup_marks_interrupted_runs_failed(settings, pg):
+    pg.execute(
+        "insert into run(id,event_name,date_from,date_to,status) values('test-zombie','x','2026-06-01','2026-06-02','extracting')"
+    )
+    api_mod.SETTINGS = settings
+    with TestClient(api_mod.app):
+        pass
+    assert pg.execute("select status from run where id='test-zombie'").fetchone()[0] == "failed"

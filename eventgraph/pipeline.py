@@ -19,7 +19,7 @@ from .source import fetch_by_ids
 log = logging.getLogger(__name__)
 
 STAGES = ("select", "extract", "batch")
-ACTIVE = ("selecting", "extracting", "batching")
+ACTIVE = ("created", "selecting", "extracting", "batching")
 _SLUG = re.compile(r"[^0-9A-Za-z가-힣]")
 
 
@@ -98,6 +98,28 @@ def _selected_docs(settings: Settings, run_id: str) -> list[tuple[int, Any]]:
     return docs
 
 
+def _record_extract_counts(settings: Settings, run_id: str, r: dict) -> None:
+    with pg_connect(settings) as conn:
+        counts = dict(
+            conn.execute(
+                "select status, count(*) from run_document where run_id=%s group by status",
+                (run_id,),
+            ).fetchall()
+        )
+        conn.execute(
+            "update run set doc_extracted=%s, doc_failed=%s,"
+            " tokens_in=tokens_in+%s, tokens_out=tokens_out+%s where id=%s",
+            (
+                counts.get("extracted", 0),
+                counts.get("failed", 0),
+                r["tokens_in"],
+                r["tokens_out"],
+                run_id,
+            ),
+        )
+        conn.commit()
+
+
 def run_pipeline(
     settings: Settings,
     run_id: str,
@@ -126,36 +148,29 @@ def run_pipeline(
             if real_llm and not settings.anthropic_api_key:
                 raise RuntimeError("ANTHROPIC_API_KEY not set in config/.env")
             _set(settings, run_id, status="extracting")
+            docs = _selected_docs(settings, run_id)
+
+            def _progress(done: int, total: int) -> None:
+                if done % 10 == 0 or done == total:
+                    _set(settings, run_id, doc_extracted=done)
+                if progress_cb:
+                    progress_cb(done, total)
+
             r = run_extraction(
                 settings,
                 run_id,
-                _selected_docs(settings, run_id),
+                docs,
                 run["event_name"],
                 seeds,
                 _client(settings, client) if real_llm else client,
                 extract_fn,
-                progress_cb,
+                _progress,
             )
             results["extract"] = r
-            with pg_connect(settings) as conn:
-                counts = dict(
-                    conn.execute(
-                        "select status, count(*) from run_document where run_id=%s group by status",
-                        (run_id,),
-                    ).fetchall()
-                )
-                conn.execute(
-                    "update run set doc_extracted=%s, doc_failed=%s,"
-                    " tokens_in=tokens_in+%s, tokens_out=tokens_out+%s where id=%s",
-                    (
-                        counts.get("extracted", 0),
-                        counts.get("failed", 0),
-                        r["tokens_in"],
-                        r["tokens_out"],
-                        run_id,
-                    ),
-                )
-                conn.commit()
+            if r["extracted"] == 0:
+                _record_extract_counts(settings, run_id, r)
+                raise RuntimeError(f"추출 성공 0건 (실패 {r['failed']}건, 대상 {len(docs)}건)")
+            _record_extract_counts(settings, run_id, r)
         if "batch" in stages:
             _set(settings, run_id, status="batching")
             results["batch"] = run_batch(settings, run_id)

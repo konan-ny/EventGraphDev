@@ -12,7 +12,7 @@ from pyspark.sql import DataFrame, SparkSession, Window
 
 from ..config import Settings
 from ..db import pg_connect
-from .normalize import norm_key
+from .normalize import name_tokens, norm_key
 from .spark import get_spark, read_extracted
 
 log = logging.getLogger(__name__)
@@ -285,12 +285,12 @@ def run_batch(settings: Settings, run_id: str) -> dict:
         .groupBy("type", "key")
         .agg(
             F.array_distinct(F.flatten(F.collect_list("aliases"))).alias("aliases"),
-            F.first("name_ko").alias("name"),
+            F.min_by("name_ko", F.length("name_ko")).alias("name"),  # deterministic
         )
         .collect()
     )
     canon = canonical_keys(
-        [(r["type"], r["key"], list(r["aliases"]), r["name"].split()) for r in key_rows]
+        [(r["type"], r["key"], list(r["aliases"]), name_tokens(r["name"])) for r in key_rows]
     )
     merged = sum(1 for (t, k), c in canon.items() if k != c)
     log.info("entity merge: %d keys folded into others", merged)
@@ -395,6 +395,7 @@ def run_batch(settings: Settings, run_id: str) -> dict:
         .transform(lambda d: _map(d, "src_temp_id", "src_id"))
         .transform(lambda d: _map(d, "dst_temp_id", "dst_id"))
         .withColumn("ev_date", F.coalesce("evidence_date", "doc_date"))
+        .filter(F.col("src_id") != F.col("dst_id"))
     )
     type_map = F.create_map(*[x for kv in rtypes.items() for x in (F.lit(kv[0]), F.lit(kv[1]))])
     rel_rows = rel_rows.withColumn(
