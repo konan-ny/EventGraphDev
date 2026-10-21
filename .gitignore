@@ -1,0 +1,8 @@
+.venv/
+data/
+config/.env
+__pycache__/
+.omc/
+.superpowers/
+*.pyc
+.pytest_cache/
