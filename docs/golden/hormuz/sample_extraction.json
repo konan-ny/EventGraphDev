@@ -1,0 +1,159 @@
+{
+ "doc": {
+  "idx": 21787812,
+  "title": "美·이란, 호르무즈 직통 소통망 구축…우발 충돌 차단 나선다",
+  "writedate": "2026-06-27 00:05:07",
+  "url": "https://n.news.naver.com/mnews/article/119/0003105275"
+ },
+ "meta": {
+  "tokens_in": 3783,
+  "tokens_out": 1456,
+  "elapsed_ms": 8576
+ },
+ "extraction": {
+  "entities": [
+   {
+    "temp_id": "e1",
+    "type": "PERSON",
+    "name_ko": "도널드 트럼프",
+    "surface_forms": [
+     "트럼프"
+    ],
+    "affiliations": [
+     {
+      "target_temp_id": "e2",
+      "role": "대통령"
+     }
+    ]
+   },
+   {
+    "temp_id": "e2",
+    "type": "COUNTRY",
+    "name_ko": "미국",
+    "surface_forms": [
+     "미국",
+     "美"
+    ],
+    "affiliations": []
+   },
+   {
+    "temp_id": "e3",
+    "type": "COUNTRY",
+    "name_ko": "이란",
+    "surface_forms": [
+     "이란",
+     "이란 국영 프레스TV"
+    ],
+    "affiliations": []
+   },
+   {
+    "temp_id": "e4",
+    "type": "PERSON",
+    "name_ko": "카젬 가리바바디",
+    "surface_forms": [
+     "카젬 가리바바디 이란 외무차관"
+    ],
+    "affiliations": [
+     {
+      "target_temp_id": "e3",
+      "role": "외무차관"
+     }
+    ]
+   },
+   {
+    "temp_id": "e5",
+    "type": "LOCATION",
+    "name_ko": "호르무즈 해협",
+    "surface_forms": [
+     "호르무즈 해협"
+    ],
+    "affiliations": []
+   },
+   {
+    "temp_id": "e6",
+    "type": "ORG",
+    "name_ko": "이슬람혁명수비대",
+    "surface_forms": [
+     "혁명수비대",
+     "IRGC"
+    ],
+    "affiliations": [
+     {
+      "target_temp_id": "e3",
+      "role": "군사 조직"
+     }
+    ]
+   },
+   {
+    "temp_id": "e7",
+    "type": "ORG",
+    "name_ko": "프레스TV",
+    "surface_forms": [
+     "프레스TV",
+     "이란 국영 프레스TV"
+    ],
+    "affiliations": [
+     {
+      "target_temp_id": "e3",
+      "role": "국영 방송"
+     }
+    ]
+   }
+  ],
+  "relations": [
+   {
+    "src_temp_id": "e2",
+    "dst_temp_id": "e3",
+    "type": "NEGOTIATES_WITH",
+    "raw_label": "",
+    "evidence": "지난달 30일 호르무즈 해협에서 선박들이 정박하고 있다. ⓒ 로이터/연합뉴스 [데일리안 = 정인균 기자] 미국과 이란이 호르무즈 해협에서 우발적인 군사 충돌을 막기 위한 직통 소통 채널을 구축했다고 이란 국영 프레스TV가 26일(현지시간) 보도했다.",
+    "evidence_date": "2026-06-26"
+   },
+   {
+    "src_temp_id": "e4",
+    "dst_temp_id": "e2",
+    "type": "CRITICIZES",
+    "raw_label": "",
+    "evidence": "카젬 가리바바디 이란 외무차관은 이날 \"호르무즈 해협의 안전한 통항은 역내 국가들의 협력과 이란의 역할을 인정하는 데서 출발한다\"고 강조하며, 미국과 걸프 국가들이 발표한 '통행료 없는 자유 항행' 공동성명을 비판했다.",
+    "evidence_date": null
+   },
+   {
+    "src_temp_id": "e6",
+    "dst_temp_id": "e5",
+    "type": "OTHER",
+    "raw_label": "선박 통항 제한",
+    "evidence": "혁명수비대(IRGC)는 허가 없이 통항하려던 외국 유조선 3척을 되돌려 보냈다고 밝혔다.",
+    "evidence_date": null
+   }
+  ],
+  "events": [
+   {
+    "date": "2026-06-26",
+    "summary_ko": "미국과 이란이 호르무즈 해협 우발 충돌 방지를 위한 직통 소통 채널을 구축했다.",
+    "participants": [
+     "e2",
+     "e3"
+    ],
+    "location_temp_id": "e5",
+    "evidence": "미국과 이란이 호르무즈 해협에서 우발적인 군사 충돌을 막기 위한 직통 소통 채널을 구축했다고 이란 국영 프레스TV가 26일(현지시간) 보도했다."
+   },
+   {
+    "date": null,
+    "summary_ko": "오만 인근에서 화물선이 피격되었다.",
+    "participants": [],
+    "location_temp_id": null,
+    "evidence": "이번 발표는 오만 인근에서 화물선이 피격된 이후 나온 것이다."
+   },
+   {
+    "date": null,
+    "summary_ko": "혁명수비대가 허가 없이 통항하려던 외국 유조선 3척을 되돌려 보냈다.",
+    "participants": [
+     "e6"
+    ],
+    "location_temp_id": "e5",
+    "evidence": "혁명수비대(IRGC)는 허가 없이 통항하려던 외국 유조선 3척을 되돌려 보냈다고 밝혔다."
+   }
+  ],
+  "dropped": 0
+ }
+}

@@ -1,0 +1,38 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - text: 사건 이름
+      - textbox "사건 이름" [ref=e4]:
+        - /placeholder: "예: 미국-이란 호르무즈 사태"
+    - generic [ref=e5]:
+      - text: 시작일
+      - textbox "시작일" [ref=e6]
+    - generic [ref=e7]:
+      - text: 종료일
+      - textbox "종료일" [ref=e8]
+    - generic [ref=e9]:
+      - text: 주요 인물(쉼표)
+      - textbox "주요 인물(쉼표)" [ref=e10]:
+        - /placeholder: 도널드 트럼프, ...
+    - generic [ref=e11]:
+      - text: 기관(쉼표)
+      - textbox "기관(쉼표)" [ref=e12]:
+        - /placeholder: 혁명수비대, ...
+    - generic [ref=e13]:
+      - text: 국가/지역(쉼표)
+      - textbox "국가/지역(쉼표)" [ref=e14]:
+        - /placeholder: 미국, 이란
+    - button "실행" [ref=e15] [cursor=pointer]
+    - generic [ref=e16]:
+      - text: 과거 실행
+      - combobox "과거 실행" [ref=e17]
+  - main [ref=e19]:
+    - complementary [ref=e21]:
+      - heading "타임라인" [level=3] [ref=e22]
+      - generic [ref=e23]:
+        - slider [ref=e24]: "0"
+        - slider [ref=e25]: "0"
+      - list
+    - generic [ref=e26]:
+      - heading "상세" [level=3] [ref=e27]
+      - generic [ref=e28]: 노드·간선·사건을 클릭하면 근거가 표시됩니다.

@@ -1,0 +1,8 @@
+[  924978ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:8765/runs/20261021-102144-%EB%AF%B8%EA%B5%AD%EC%9D%B4%EB%9E%80%ED%98%B8%EB%A5%B4%EB%AC%B4%EC%A6%88/entities/270:0
+[  924978ms] Error: entity not found
+    at api (http://127.0.0.1:8765/:63:81)
+    at async et.<anonymous> (http://127.0.0.1:8765/:158:13)
+[  925442ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:8765/runs/20261021-102144-%EB%AF%B8%EA%B5%AD%EC%9D%B4%EB%9E%80%ED%98%B8%EB%A5%B4%EB%AC%B4%EC%A6%88/entities/58:0
+[  925442ms] Error: entity not found
+    at api (http://127.0.0.1:8765/:63:81)
+    at async et.<anonymous> (http://127.0.0.1:8765/:158:13)
