@@ -1,4 +1,5 @@
 """Settings loaded from config/.env (plain KEY=VALUE, split on first '=')."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
