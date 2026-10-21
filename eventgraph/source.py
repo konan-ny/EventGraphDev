@@ -78,3 +78,27 @@ def fetch_candidates(settings: Settings, date_from: date, date_to: date) -> tupl
     stats["total"] = len(docs)
     log.info("fetch_candidates %s..%s: %s", lo, date_to, stats)
     return docs, stats
+
+
+def fetch_by_ids(settings: Settings, table: str, ids: list[int]) -> dict[int, Doc]:
+    """Re-read selected rows (stage B needs bodies that run_document does not store)."""
+    if not ids:
+        return {}
+    marks = ",".join(["%s"] * len(ids))
+    with mysql_connect(settings) as conn, conn.cursor() as cur:
+        cur.execute(
+            f"SELECT idx, title, body, writedate, url, url2 FROM `{table}` WHERE idx IN ({marks})",
+            ids,
+        )
+        return {
+            int(r["idx"]): Doc(
+                table,
+                int(r["idx"]),
+                r["title"],
+                clean_body(r["body"]),
+                r["writedate"],
+                r["url"] or "",
+                press_from_url(r["url2"] or ""),
+            )
+            for r in cur.fetchall()
+        }
