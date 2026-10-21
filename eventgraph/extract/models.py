@@ -96,3 +96,63 @@ class Extraction(BaseModel):
         if self.dropped:
             log.warning("extraction repair dropped %d dangling references", self.dropped)
         return self
+
+
+def _obj(props: dict, required: list[str] | None = None) -> dict:
+    return {
+        "type": "object",
+        "properties": props,
+        "required": required or list(props),
+        "additionalProperties": False,
+    }
+
+
+_STR = {"type": "string"}
+_NSTR = {"type": ["string", "null"]}
+_STRS = {"type": "array", "items": _STR}
+
+# Strict JSON schema for output_config.format: every key required, no extras.
+OUTPUT_SCHEMA = _obj(
+    {
+        "entities": {
+            "type": "array",
+            "items": _obj(
+                {
+                    "temp_id": _STR,
+                    "type": {"type": "string", "enum": sorted(ENTITY_TYPES)},
+                    "name_ko": _STR,
+                    "surface_forms": _STRS,
+                    "affiliations": {
+                        "type": "array",
+                        "items": _obj({"target_temp_id": _STR, "role": _STR}),
+                    },
+                }
+            ),
+        },
+        "relations": {
+            "type": "array",
+            "items": _obj(
+                {
+                    "src_temp_id": _STR,
+                    "dst_temp_id": _STR,
+                    "type": _STR,
+                    "raw_label": _STR,
+                    "evidence": _STR,
+                    "evidence_date": _NSTR,
+                }
+            ),
+        },
+        "events": {
+            "type": "array",
+            "items": _obj(
+                {
+                    "date": _NSTR,
+                    "summary_ko": _STR,
+                    "participants": _STRS,
+                    "location_temp_id": _NSTR,
+                    "evidence": _STR,
+                }
+            ),
+        },
+    }
+)

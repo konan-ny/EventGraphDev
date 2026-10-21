@@ -8,7 +8,7 @@ import time
 from pydantic import ValidationError
 
 from ..source import Doc
-from .models import Extraction
+from .models import OUTPUT_SCHEMA, Extraction
 from .prompt import SYSTEM_PROMPT, build_user_message
 
 log = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def extract_document(
         model=model,
         max_tokens=MAX_TOKENS,
         system=SYSTEM_PROMPT,
-        output_config={"effort": "low"},
+        output_config={"effort": "low", "format": {"type": "json_schema", "schema": OUTPUT_SCHEMA}},
         messages=[{"role": "user", "content": build_user_message(doc, event_name, seeds)}],
     )
     meta = {
