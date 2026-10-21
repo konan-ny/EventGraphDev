@@ -75,16 +75,32 @@ _CLUSTER = T.StructType(
 # ---------- pure helpers (driver side / UDF bodies) ----------
 
 
-def canonical_keys(rows: list[tuple[str, str, list[str]]]) -> dict[tuple[str, str], str]:
-    """(type, key, alias_keys) -> mapping (type,key) -> canonical key.
+def _edit1(a: str, b: str) -> bool:
+    """Levenshtein distance <= 1 (both at least 2 chars)."""
+    if min(len(a), len(b)) < 2 or abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        return sum(x != y for x, y in zip(a, b, strict=True)) <= 1
+    short, long_ = sorted((a, b), key=len)
+    return any(long_[:i] + long_[i + 1 :] == short for i in range(len(long_)))
 
-    PERSON only: a key that equals an alias of exactly one other key, or is a proper suffix
-    of exactly one longer key (e.g. '트럼프' -> '도널드트럼프'), merges into it.
+
+def canonical_keys(
+    rows: list[tuple[str, str, list[str], list[str]]],
+) -> dict[tuple[str, str], str]:
+    """(type, key, alias_keys, name_tokens) -> mapping (type,key) -> canonical key. PERSON only:
+
+    A. key equals an alias (surface form) of exactly one other key -> that key
+    B. single-token name whose key is a suffix of exactly one longer key ('트럼프' -> '도널드트럼프')
+    C. transliteration variant: same/suffix surname (last token) and first token within edit
+       distance 1 ('마르코 루비오' ~ '마코 루비오'), exactly one candidate
     """
     keys_by_type: dict[str, set[str]] = {}
-    aliases: dict[str, dict[str, set[str]]] = {}  # type -> alias -> owners
-    for typ, key, als in rows:
+    aliases: dict[str, dict[str, set[str]]] = {}
+    tokens: dict[tuple[str, str], list[str]] = {}
+    for typ, key, als, toks in rows:
         keys_by_type.setdefault(typ, set()).add(key)
+        tokens[(typ, key)] = toks
         for a in als:
             if a != key:
                 aliases.setdefault(typ, {}).setdefault(a, set()).add(key)
@@ -93,21 +109,57 @@ def canonical_keys(rows: list[tuple[str, str, list[str]]]) -> dict[tuple[str, st
         for k in keys:
             target = k
             if typ == "PERSON":
+                toks = tokens[(typ, k)]
                 owners = aliases.get(typ, {}).get(k, set()) - {k}
-                longer = [k2 for k2 in keys if k2 != k and len(k) >= 2 and k2.endswith(k)]
+                longer = (
+                    [k2 for k2 in keys if k2 != k and len(k) >= 2 and k2.endswith(k)]
+                    if len(toks) == 1
+                    else []
+                )
+                variants = []
+                if len(toks) >= 2:
+                    for k2 in keys:
+                        t2 = tokens[(typ, k2)]
+                        if k2 == k or len(t2) < 2:
+                            continue
+                        last, last2 = toks[-1], t2[-1]
+                        same_last = last == last2 or (
+                            min(len(last), len(last2)) >= 3
+                            and (last.endswith(last2) or last2.endswith(last))
+                        )
+                        # first token of the shorter name must match any non-surname token
+                        # of the other ('압바스 아라그치' ~ '세예드 아바스 아라그치')
+                        a_, b_ = (toks, t2) if len(toks) <= len(t2) else (t2, toks)
+                        if same_last and any(a_[0] == t or _edit1(a_[0], t) for t in b_[:-1]):
+                            variants.append(k2)
                 if len(owners) == 1:
                     target = next(iter(owners))
                 elif len(longer) == 1:
                     target = longer[0]
+                elif len(variants) == 1 and (len(variants[0]), variants[0]) > (len(k), k):
+                    target = variants[0]  # fold into the longer (tie: lexically larger) spelling
             canon[(typ, k)] = target
-    # resolve chains: a -> b -> c
-    for (typ, k), t in list(canon.items()):
+    _resolve_chains(canon)
+    # rule B again against resolved targets: '갈리바프' with two spellings that merged into one
+    for typ, keys in keys_by_type.items():
+        if typ != "PERSON":
+            continue
+        for k in keys:
+            if canon[(typ, k)] == k and len(tokens[(typ, k)]) == 1 and len(k) >= 2:
+                targets = {canon[(typ, k2)] for k2 in keys if k2 != k and k2.endswith(k)}
+                if len(targets) == 1:
+                    canon[(typ, k)] = next(iter(targets))
+    _resolve_chains(canon)
+    return canon
+
+
+def _resolve_chains(canon: dict[tuple[str, str], str]) -> None:
+    for (typ, k), t in list(canon.items()):  # a -> b -> c  ==>  a -> c
         seen = {k}
         while canon.get((typ, t), t) != t and t not in seen:
             seen.add(t)
             t = canon[(typ, t)]
         canon[(typ, k)] = t
-    return canon
 
 
 def cluster_events(events: list) -> list:
@@ -227,13 +279,19 @@ def run_batch(settings: Settings, run_id: str) -> dict:
         ex.select(
             "type",
             "key",
+            "name_ko",
             norm_list_udf("type", "surface_forms").alias("aliases"),
         )
         .groupBy("type", "key")
-        .agg(F.array_distinct(F.flatten(F.collect_list("aliases"))).alias("aliases"))
+        .agg(
+            F.array_distinct(F.flatten(F.collect_list("aliases"))).alias("aliases"),
+            F.first("name_ko").alias("name"),
+        )
         .collect()
     )
-    canon = canonical_keys([(r["type"], r["key"], list(r["aliases"])) for r in key_rows])
+    canon = canonical_keys(
+        [(r["type"], r["key"], list(r["aliases"]), r["name"].split()) for r in key_rows]
+    )
     merged = sum(1 for (t, k), c in canon.items() if k != c)
     log.info("entity merge: %d keys folded into others", merged)
     # ponytail: dict pickled into the UDF closure (thousands of keys); broadcast if it grows
