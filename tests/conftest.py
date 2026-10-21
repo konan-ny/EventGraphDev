@@ -23,6 +23,8 @@ def pg(settings):
             for t in RUN_TABLES:
                 if t == "event_participant":
                     cur.execute("delete from event_participant where event_id in (select id from event where run_id like %s)", (TEST_RUN_PREFIX + "%",))
+                elif t == "run":
+                    cur.execute("delete from run where id like %s", (TEST_RUN_PREFIX + "%",))
                 else:
                     cur.execute(f"delete from {t} where run_id like %s", (TEST_RUN_PREFIX + "%",))
     conn.close()
