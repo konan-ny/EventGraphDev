@@ -36,9 +36,7 @@ def pg(settings):
                         (TEST_RUN_PREFIX + "%",),
                     )
                 elif t == "run":
-                    cur.execute(
-                        "delete from run where id like %s", (TEST_RUN_PREFIX + "%",)
-                    )
+                    cur.execute("delete from run where id like %s", (TEST_RUN_PREFIX + "%",))
                 else:
                     cur.execute(
                         f"delete from {t} where run_id like %s",

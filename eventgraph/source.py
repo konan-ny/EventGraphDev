@@ -45,9 +45,7 @@ def press_from_url(url2: str) -> str:
     return _HOST_PREFIX.sub("", host)
 
 
-def fetch_candidates(
-    settings: Settings, date_from: date, date_to: date
-) -> tuple[list[Doc], dict]:
+def fetch_candidates(settings: Settings, date_from: date, date_to: date) -> tuple[list[Doc], dict]:
     t = settings.db_table
     lo, hi = date_from.isoformat(), (date_to + timedelta(days=1)).isoformat()
     base = f"FROM `{t}` WHERE writedate >= %s AND writedate < %s"
