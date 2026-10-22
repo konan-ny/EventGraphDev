@@ -82,8 +82,9 @@ DOCS = [
 
 
 def _make_fixture(tmp_path, pg, run_id):
-    pg.execute("delete from run_document where run_id=%s", (run_id,))
-    pg.execute("delete from run where id=%s", (run_id,))
+    from tests.conftest import purge_runs
+
+    purge_runs(pg, run_id)
     pg.execute(
         "insert into run(id,event_name,date_from,date_to) values(%s,'ev','2026-06-24','2026-07-02')",
         (run_id,),
