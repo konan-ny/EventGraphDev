@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EventGraph 시안 B-2</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #ECEEF1; color: #1B232B; font: 15px/1.5 "IBM Plex Sans KR", sans-serif; padding: 28px 32px 60px; }
+  h2 { font-size: 22px; margin: 0 0 4px; font-weight: 600; }
+  .sub { color: #5B6670; margin: 0 0 22px; }
+  .frame { background: #fff; border: 1.5px solid #D5DAE0; border-radius: 10px; overflow: hidden; }
+  .shot { width: 100%; aspect-ratio: 16 / 9; }
+
+  .B { background: #EEF1F4; color: #1C2733; height: 100%; display: grid; grid-template-rows: 56px 1fr 150px; }
+  .hd { display: flex; align-items: baseline; gap: 18px; padding: 0 22px; background: #fff; border-bottom: 1px solid #D9DFE5; }
+  .hd h1 { font: 700 20px/56px "Noto Serif KR", serif; margin: 0; }
+  .hd .meta { color: #5B6670; font-size: 13px; }
+  .hd .pill { margin-left: auto; font-size: 12.5px; color: #0F6E6E; border: 1px solid #0F6E6E; border-radius: 999px; padding: 2px 10px; align-self: center; }
+  .hd .btn { font-size: 12.5px; color: #fff; background: #0F6E6E; border-radius: 6px; padding: 5px 12px; align-self: center; }
+  .mid { display: grid; grid-template-columns: 1fr 380px; min-height: 0; }
+  .plate { margin: 16px 0 16px 16px; background: #fff; border: 1px solid #D9DFE5; position: relative; overflow: hidden; }
+  .plate .cap { position: absolute; left: 14px; top: 10px; font: 700 15px "Noto Serif KR", serif; z-index: 1; }
+  .plate .cap small { display: block; font: 400 12px "IBM Plex Sans KR", sans-serif; color: #5B6670; }
+  .plate .ctl { position: absolute; right: 14px; top: 12px; display: flex; gap: 6px; font-size: 11.5px; z-index: 1; }
+  .plate .ctl span { border: 1px solid #D9DFE5; border-radius: 5px; padding: 3px 8px; color: #3C4752; background: #fff; }
+  .plate .ctl span.on { border-color: #0F6E6E; color: #0F6E6E; font-weight: 600; }
+  .plate .leg { position: absolute; left: 14px; bottom: 10px; font-size: 11.5px; color: #5B6670; display: flex; gap: 10px; }
+  .plate .leg i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+  .foot { background: #fff; border-left: 1px solid #D9DFE5; margin: 16px 16px 16px 0; border: 1px solid #D9DFE5; padding: 14px 18px; font-size: 12.5px; overflow: hidden; }
+  .foot h4 { font: 700 15px "Noto Serif KR", serif; margin: 0; }
+  .foot .rel { color: #0F6E6E; margin: 2px 0 12px; font-weight: 600; }
+  .foot ol { margin: 0; padding-left: 20px; }
+  .foot li { margin-bottom: 9px; color: #2A3540; }
+  .foot li small { display: block; color: #6B7680; }
+  .foot li small u { text-decoration: none; color: #0F6E6E; }
+  .tl { background: #fff; border-top: 1px solid #D9DFE5; padding: 10px 22px 8px; position: relative; }
+  .tl .axis { position: relative; height: 2px; background: #D9DFE5; margin: 30px 0 8px; }
+  .tl .win { position: absolute; left: 66%; width: 23%; top: -10px; height: 22px; border: 2px solid #0F6E6E; border-radius: 4px; background: rgba(15,110,110,.08); }
+  .tl .ev { position: absolute; top: -8px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; font-size: 11px; color: #3C4752; }
+  .tl .ev i { width: 10px; height: 10px; border-radius: 50%; background: #AEB8C2; border: 2px solid #fff; box-shadow: 0 0 0 1px #AEB8C2; }
+  .tl .ev.on i { background: #0F6E6E; box-shadow: 0 0 0 1px #0F6E6E; }
+  .tl .ev b { margin-top: 4px; font-weight: 600; color: #0F6E6E; }
+  .tl .ev span { max-width: 130px; text-align: center; line-height: 1.25; }
+  .tl .days { display: flex; justify-content: space-between; font-size: 11px; color: #8A97A5; margin-top: 44px; }
+  .tl .cap { position: absolute; left: 22px; top: 10px; font: 700 13px "Noto Serif KR", serif; }
+  .tl .cap small { font: 400 12px "IBM Plex Sans KR", sans-serif; color: #5B6670; margin-left: 8px; }
+  .tl .more { position: absolute; right: 22px; top: 10px; font-size: 12px; color: #0F6E6E; }
+  .notes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 12px 18px 16px; font-size: 13px; color: #3C4752; border-top: 1px solid #E6E9ED; }
+  .notes b { display: block; color: #1B232B; margin-bottom: 2px; font-weight: 600; }
+</style>
+</head>
+<body>
+<h2>B-2 분석 노트, 타임라인을 아래로</h2>
+<p class="sub">왼쪽 세로 목록을 하단 가로 축으로 옮겼습니다. 그래프 액자가 넓어지고, 사건은 날짜 축 위의 점으로 놓여 구간 창(초록 테두리)을 끌어 기간을 좁힙니다.</p>
+
+<div class="frame">
+  <div class="shot"><div class="B">
+    <div class="hd"><h1>호르무즈 사태</h1><span class="meta">2026.06.24 – 07.02 · 기사 300건 · 인물 71 · 기관 54 · 국가 32</span><span class="pill">보는 기간 06.30 – 07.01</span><span class="btn">새 분석</span></div>
+    <div class="mid">
+      <div class="plate">
+        <div class="cap">관계도 <small>핵심 인물 12 · 간선 34 · 주변 185 접힘</small></div>
+        <div class="ctl"><span class="on">핵심</span><span>전체</span><span>인물만</span><span>소속 숨김</span></div>
+        <svg viewBox="40 30 620 360" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;padding:40px 0 20px">
+          <g stroke="#AEB8C2" fill="none">
+            <path d="M250 200 L420 210" stroke-width="5" stroke="#0F6E6E"/>
+            <path d="M250 200 L200 100" stroke-width="2"/><path d="M420 210 L500 110" stroke-width="2.5"/>
+            <path d="M250 200 L120 250" stroke-width="1.5"/><path d="M420 210 L580 260" stroke-width="2"/>
+            <path d="M200 100 L420 210" stroke-width="1.5"/><path d="M250 200 L290 330" stroke-width="1.5"/><path d="M420 210 L400 330" stroke-width="2"/>
+            <path d="M580 260 L630 350" stroke-width="1"/><path d="M120 250 L90 340" stroke-width="1"/>
+          </g>
+          <g font-size="10.5" fill="#0F6E6E" font-weight="600"><text x="310" y="196">협상 ¹²³⁴</text></g>
+          <g font-size="9.5" fill="#6B7680"><text x="252" y="150">비난</text><text x="476" y="158">공격</text><text x="170" y="232">회담</text><text x="510" y="246">지지</text><text x="250" y="270">명령</text><text x="422" y="276">제재</text></g>
+          <g font-size="11.5" fill="#1C2733" text-anchor="middle">
+            <polygon points="250,172 274,186 274,214 250,228 226,214 226,186" fill="#2F8F6B"/><text x="250" y="250">미국</text>
+            <polygon points="420,182 444,196 444,224 420,238 396,224 396,196" fill="#2F8F6B"/><text x="420" y="260">이란</text>
+            <circle cx="200" cy="100" r="21" fill="#2E5E9E"/><text x="200" y="76">도널드 트럼프</text><text x="200" y="136" fill="#6B7680" font-size="10">미국 · 대통령</text>
+            <circle cx="500" cy="110" r="17" fill="#2E5E9E"/><text x="500" y="86">아바스 아라그치</text><text x="500" y="142" fill="#6B7680" font-size="10">이란 · 외무장관</text>
+            <circle cx="120" cy="250" r="15" fill="#2E5E9E"/><text x="120" y="280">스티브 위트코프</text>
+            <polygon points="580,240 599,251 599,273 580,284 561,273 561,251" fill="#2F8F6B"/><text x="580" y="302">카타르</text>
+            <rect x="386" y="318" width="28" height="22" rx="3" fill="#7C5CBF"/><text x="400" y="358">혁명수비대</text>
+            <rect x="276" y="318" width="28" height="22" rx="3" fill="#7C5CBF"/><text x="290" y="358">중부사령부</text>
+            <circle cx="630" cy="350" r="10" fill="#2E5E9E" opacity=".55"/><text x="630" y="372" opacity=".65">알사니</text>
+            <circle cx="90" cy="340" r="10" fill="#2E5E9E" opacity=".55"/><text x="90" y="362" opacity=".65">쿠슈너</text>
+          </g>
+        </svg>
+        <div class="leg"><span><i style="background:#2E5E9E"></i>인물</span><span><i style="background:#2F8F6B"></i>국가</span><span><i style="background:#7C5CBF"></i>기관</span><span>선 굵기 = 근거 기사 수</span></div>
+      </div>
+      <div class="foot">
+        <h4>미국 → 이란</h4><div class="rel">협상 · 근거 24건 · 06.24 – 07.01</div>
+        <ol>
+          <li>미국과 이란이 호르무즈 해협에서 격화하고 있는 무력 충돌을 일단 중단하고 30일 카타르 수도 도하에서 후속 회담을 하기로 했다는 보도가 나왔다.<small>06.29 · 국민일보 · <u>“美·이란, 호르무즈 충돌 중단하고 30일 회담”</u></small></li>
+          <li>양측은 핵 문제와 같은 핵심 쟁점은 2단계 협상으로 넘기고 우선 호르무즈 해협의 안전한 항행과 군사 충돌 방지에 집중하기로.<small>06.30 · 한국경제 · <u>[외신 에스프레소] 美·이란 교전 중단 합의</u></small></li>
+          <li>미국이 이란 전쟁을 끝내기 위한 양해각서에 따라 이란산 원유 수출에 대한 제재를 한시적으로 면제하면서 이란 경제가 상당한 이익을…<small>06.24 · 연합뉴스 · <u>“美 원유 제재 면제로 이란 60일간 최대 4조7천억원”</u></small></li>
+          <li>미·이란 대표단은 지난달 30일 중재국 카타르 도하에 함께 머물면서도 직접 협상 테이블에는 앉지 않았다.<small>07.01 · 조선비즈 · <u>60일 중 14일 지났는데 핵협상은 ‘0’</u></small></li>
+        </ol>
+      </div>
+    </div>
+    <div class="tl">
+      <div class="cap">사건 <small>173건 중 날짜 있는 148건 · 점 크기 = 기사 수</small></div><div class="more">목록으로 보기</div>
+      <div class="axis">
+        <div class="ev" style="left:11%"><i></i><b>06.25</b><span>이란, 상선 드론 공격</span></div>
+        <div class="ev" style="left:24%"><i></i><b>06.26</b><span>미군, 이란 시설 타격</span></div>
+        <div class="ev" style="left:38%"><i></i><b>06.27</b><span>혁명수비대, 미군기지 공격</span></div>
+        <div class="ev" style="left:52%"><i></i><b>06.28</b><span>트럼프 “이란 존재 사라질 수도”</span></div>
+        <div class="ev on" style="left:72%"><i></i><b>06.30</b><span>미·이란 도하 회담 (24)</span></div>
+        <div class="ev" style="left:85%"><i></i><b>07.01</b><span>동결자금 해제 설명 엇갈려</span></div>
+        <div class="win"></div>
+      </div>
+      <div class="days"><span>06.24</span><span>06.26</span><span>06.28</span><span>06.30</span><span>07.02</span></div>
+    </div>
+  </div></div>
+  <div class="notes">
+    <div><b>바뀐 점</b>타임라인이 하단 가로 축. 액자가 가로로 넓어져 노드 간격이 늘어남.</div>
+    <div><b>타임라인 조작</b>초록 구간 창을 끌어 기간 선택, 점을 클릭하면 참여 인물 강조 + 각주가 사건 근거로 바뀜. "목록으로 보기"로 긴 목록 전환.</div>
+    <div><b>그대로인 것</b>회백색 + 청록, 세리프 제목, 번호 각주, 핵심/전체 토글.</div>
+  </div>
+</div>
+</body>
+</html>

@@ -4,172 +4,342 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>EventGraph</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.4/cytoscape.min.js"></script>
 <style>
-  :root { --bg:#fff; --fg:#1b1b1b; --muted:#666; --line:#ddd; --panel:#f6f6f8; --accent:#2b6cb0; --hl:#e53e3e; }
-  * { box-sizing: border-box; }
-  body { margin:0; font: 14px/1.45 system-ui, "Malgun Gothic", sans-serif; color:var(--fg); background:var(--bg); }
-  header { padding:10px 16px; border-bottom:1px solid var(--line); display:flex; gap:8px; flex-wrap:wrap; align-items:end; }
-  header label { display:flex; flex-direction:column; font-size:12px; color:var(--muted); }
-  header input, header select { padding:5px 7px; border:1px solid var(--line); border-radius:4px; font:inherit; min-width:120px; }
-  header input.wide { min-width:220px; }
-  button { padding:6px 12px; border:1px solid var(--accent); background:var(--accent); color:#fff; border-radius:4px; cursor:pointer; font:inherit; }
-  button:disabled { opacity:.5; cursor:default; }
-  #status { width:100%; font-size:13px; color:var(--muted); min-height:18px; }
-  main { display:grid; grid-template-columns: 7fr 3fr; grid-template-rows: minmax(360px, 60vh) auto; gap:0; }
-  #cy { border-right:1px solid var(--line); min-height:360px; }
-  aside { padding:10px 12px; overflow:auto; max-height:60vh; }
-  aside h3, #detail h3 { margin:0 0 6px; font-size:13px; color:var(--muted); font-weight:600; }
-  .range { display:flex; gap:6px; align-items:center; font-size:12px; margin-bottom:8px; }
-  .range input[type=range] { flex:1; }
-  ul.timeline { list-style:none; margin:0; padding:0; }
-  ul.timeline li { padding:6px 8px; border-left:3px solid var(--line); margin-bottom:4px; cursor:pointer; background:var(--panel); border-radius:0 4px 4px 0; }
-  ul.timeline li:hover, ul.timeline li.active { border-left-color:var(--accent); }
-  ul.timeline .d { font-weight:600; font-size:12px; color:var(--accent); }
-  ul.timeline .n { color:var(--muted); font-size:12px; }
-  #detail { grid-column: 1 / -1; border-top:1px solid var(--line); padding:10px 16px; min-height:120px; }
-  #detail .ev { padding:6px 0; border-bottom:1px dashed var(--line); }
-  #detail .src { color:var(--muted); font-size:12px; }
-  #detail a { color:var(--accent); }
-  .tag { display:inline-block; padding:1px 6px; border-radius:10px; background:var(--panel); font-size:12px; margin-right:4px; }
-  @media (max-width: 800px) { main { grid-template-columns:1fr; } #cy { border-right:0; border-bottom:1px solid var(--line); } }
+  :root {
+    --bg:#EEF1F4; --panel:#FFFFFF; --ink:#1C2733; --muted:#5B6670; --faint:#8A97A5; --line:#D9DFE5;
+    --accent:#0F6E6E; --accent-soft:rgba(15,110,110,.10);
+    --person:#2E5E9E; --country:#2F8F6B; --org:#7C5CBF; --location:#B7791F;
+    --serif:"Noto Serif KR", serif; --sans:"IBM Plex Sans KR", system-ui, sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 var(--sans); display:grid; grid-template-rows:auto auto minmax(0,1fr) 168px; }
+  .hd { grid-row:1; } .form { grid-row:2; } .mid { grid-row:3; } .tl { grid-row:4; }
+  [hidden] { display:none !important; }
+  a { color:var(--accent); }
+  button { font:inherit; cursor:pointer; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  /* header */
+  .hd { background:var(--panel); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:18px; padding:0 22px; min-height:58px; }
+  .hd h1 { font:700 20px/1.2 var(--serif); margin:0; white-space:nowrap; }
+  .hd h1.empty { color:var(--faint); font-weight:500; }
+  .hd .meta { color:var(--muted); font-size:13px; }
+  .hd .period { margin-left:auto; font-size:12.5px; color:var(--accent); border:1px solid var(--accent); border-radius:999px; padding:3px 11px; white-space:nowrap; }
+  .hd select { font:inherit; font-size:13px; padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; max-width:260px; }
+  .hd .new { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:7px 13px; font-weight:500; }
+  .hd .new[aria-expanded="true"] { background:var(--ink); }
+
+  /* form */
+  .form { background:var(--panel); border-bottom:1px solid var(--line); padding:12px 22px 14px; display:none; gap:10px; flex-wrap:wrap; align-items:end; }
+  .form.open { display:flex; }
+  .form label { display:flex; flex-direction:column; font-size:12px; color:var(--muted); gap:3px; }
+  .form input { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; min-width:140px; }
+  .form input.wide { min-width:260px; }
+  .form .go { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:8px 14px; font-weight:500; }
+  .form .go:disabled { opacity:.5; cursor:default; }
+  .form .status { width:100%; font-size:13px; color:var(--muted); min-height:18px; }
+  .form .status.err { color:#B4432E; }
+
+  /* middle */
+  .mid { display:grid; grid-template-columns:1fr 380px; gap:16px; padding:16px 16px 0; min-height:0; }
+  .plate { background:var(--panel); border:1px solid var(--line); position:relative; min-height:0; }
+  .plate .cap { position:absolute; left:14px; top:10px; z-index:2; font:700 15px var(--serif); pointer-events:none; }
+  .plate .cap small { display:block; font:400 12px var(--sans); color:var(--muted); }
+  .plate .ctl { position:absolute; right:14px; top:12px; z-index:2; display:flex; gap:6px; }
+  .plate .ctl button { font-size:11.5px; border:1px solid var(--line); border-radius:5px; padding:3px 9px; color:#3C4752; background:#fff; }
+  .plate .ctl button[aria-pressed="true"] { border-color:var(--accent); color:var(--accent); font-weight:600; background:var(--accent-soft); }
+  .plate .leg { position:absolute; left:14px; bottom:10px; z-index:2; font-size:11.5px; color:var(--muted); display:flex; gap:12px; pointer-events:none; }
+  .plate .leg i { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; vertical-align:-1px; }
+  #cy { position:absolute; inset:0; }
+  .plate .empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--faint); text-align:center; padding:40px; }
+
+  .notes { background:var(--panel); border:1px solid var(--line); padding:14px 18px; overflow:auto; min-height:0; font-size:12.5px; }
+  .notes h4 { font:700 15px var(--serif); margin:0; }
+  .notes .rel { color:var(--accent); margin:2px 0 12px; font-weight:600; }
+  .notes ol { margin:0; padding-left:20px; }
+  .notes li { margin-bottom:10px; color:#2A3540; }
+  .notes li small { display:block; color:var(--muted); margin-top:2px; }
+  .notes dl { margin:0; display:grid; grid-template-columns:auto 1fr; gap:4px 12px; }
+  .notes dt { color:var(--muted); }
+  .notes dd { margin:0; }
+  .notes .hint { color:var(--faint); }
+  .tag { display:inline-block; padding:1px 7px; border-radius:10px; background:var(--bg); font-size:11.5px; margin-left:6px; vertical-align:middle; }
+
+  /* timeline */
+  .tl { background:var(--panel); border-top:1px solid var(--line); margin-top:16px; padding:10px 22px 6px; position:relative; }
+  .tl .cap { font:700 13px var(--serif); }
+  .tl .cap small { font:400 12px var(--sans); color:var(--muted); margin-left:8px; }
+  .tl .mode { position:absolute; right:22px; top:9px; font-size:12px; background:none; border:0; color:var(--accent); padding:0; }
+  .axis { position:relative; height:104px; margin:6px 8px 0; cursor:crosshair; user-select:none; touch-action:none; }
+  .axis .rule { position:absolute; left:0; right:0; top:44px; height:2px; background:var(--line); }
+  .axis .win { position:absolute; top:34px; height:22px; border:2px solid var(--accent); border-radius:4px; background:var(--accent-soft); pointer-events:none; }
+  .axis .day { position:absolute; top:52px; font-size:10.5px; color:var(--faint); transform:translateX(-50%); }
+  .axis .day::before { content:""; position:absolute; left:50%; top:-8px; width:1px; height:6px; background:var(--line); }
+  .axis .ev { position:absolute; transform:translate(-50%,-50%); top:45px; border-radius:50%; background:#C3CBD3; border:1.5px solid #fff; cursor:pointer; opacity:.9; }
+  .axis .ev.on { background:var(--accent); }
+  .axis .ev.sel { background:var(--ink); box-shadow:0 0 0 2px var(--ink); z-index:2; }
+  .axis .ev:hover { z-index:2; opacity:1; }
+  .axis .lbl { position:absolute; transform:translateX(-50%); font-size:11px; color:#3C4752; text-align:center; width:170px; line-height:1.2; pointer-events:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .axis .lbl b { color:var(--accent); font-weight:600; margin-right:4px; }
+  .axis .lbl.r1 { top:4px; } .axis .lbl.r2 { top:70px; }
+  .tl ul { list-style:none; margin:8px 0 0; padding:0; max-height:120px; overflow:auto; display:none; }
+  .tl.list ul { display:block; } .tl.list .axis { display:none; }
+  .tl li { padding:4px 8px; border-left:3px solid var(--line); margin-bottom:3px; cursor:pointer; font-size:12.5px; }
+  .tl li.on { border-left-color:var(--accent); } .tl li.sel { background:var(--accent-soft); }
+  .tl li b { color:var(--accent); font-weight:600; margin-right:6px; }
+  .tl li span { color:var(--muted); font-size:11.5px; margin-left:6px; }
+
+  @media (max-width: 900px) {
+    body { grid-template-rows:auto auto auto auto; height:auto; }
+    .mid { grid-template-columns:1fr; } .plate { height:60vh; } .notes { max-height:40vh; }
+  }
+  @media (prefers-reduced-motion: no-preference) { .plate .ctl button, .tl li { transition:background .12s, border-color .12s; } }
 </style>
 </head>
 <body>
-<header>
-  <label>사건 이름 <input id="event" class="wide" placeholder="예: 미국-이란 호르무즈 사태"></label>
-  <label>시작일 <input id="from" type="date"></label>
-  <label>종료일 <input id="to" type="date"></label>
-  <label>주요 인물(쉼표) <input id="persons" class="wide" placeholder="도널드 트럼프, ..."></label>
-  <label>기관(쉼표) <input id="orgs" placeholder="혁명수비대, ..."></label>
-  <label>국가/지역(쉼표) <input id="countries" placeholder="미국, 이란"></label>
-  <button id="go">실행</button>
-  <label>과거 실행 <select id="runs"></select></label>
-  <div id="status"></div>
+<header class="hd">
+  <h1 id="title" class="empty">분석을 선택하세요</h1>
+  <span id="meta" class="meta"></span>
+  <span id="period" class="period" hidden></span>
+  <select id="runs" aria-label="과거 분석"></select>
+  <button id="new" class="new" aria-expanded="false" aria-controls="form">새 분석</button>
 </header>
-<main>
-  <div id="cy"></div>
-  <aside>
-    <h3>타임라인</h3>
-    <div class="range">
-      <span id="r1"></span><input id="s1" type="range" min="0" max="0" value="0"><input id="s2" type="range" min="0" max="0" value="0"><span id="r2"></span>
+<section id="form" class="form">
+  <label>사건 이름 <input id="event" class="wide" placeholder="예: 미국-이란 호르무즈 사태" required></label>
+  <label>시작일 <input id="from" type="date" required></label>
+  <label>종료일 <input id="to" type="date" required></label>
+  <label>주요 인물 (쉼표) <input id="persons" class="wide" placeholder="도널드 트럼프, 아바스 아라그치"></label>
+  <label>기관 (쉼표) <input id="orgs" placeholder="혁명수비대"></label>
+  <label>국가·지역 (쉼표) <input id="countries" placeholder="미국, 이란"></label>
+  <button id="go" class="go">분석 시작</button>
+  <div id="status" class="status"></div>
+</section>
+<main class="mid">
+  <section class="plate">
+    <div class="cap">관계도 <small id="cap">-</small></div>
+    <div class="ctl" role="group" aria-label="보기">
+      <button id="m-core" aria-pressed="true">핵심</button>
+      <button id="m-all" aria-pressed="false">전체</button>
+      <button id="f-person" aria-pressed="false">인물만</button>
+      <button id="f-aff" aria-pressed="false">소속 숨김</button>
     </div>
-    <ul id="timeline" class="timeline"></ul>
-  </aside>
-  <section id="detail"><h3>상세</h3><div id="detail-body">노드·간선·사건을 클릭하면 근거가 표시됩니다.</div></section>
+    <div id="cy"></div>
+    <div id="empty" class="empty">오른쪽 위 "새 분석"으로 사건을 입력하거나, 과거 분석을 선택하세요.</div>
+    <div class="leg"><span><i style="background:var(--person)"></i>인물</span><span><i style="background:var(--country)"></i>국가</span><span><i style="background:var(--org)"></i>기관</span><span><i style="background:var(--location)"></i>지역</span><span>선 굵기 = 근거 기사 수</span></div>
+  </section>
+  <aside id="notes" class="notes"><p class="hint">간선을 클릭하면 근거 문장과 출처가, 노드를 클릭하면 별칭·소속·관련 사건이 여기에 나옵니다.</p></aside>
 </main>
+<footer id="tl" class="tl">
+  <div class="cap">사건 <small id="tlcap"></small></div>
+  <button id="tlmode" class="mode">목록으로 보기</button>
+  <div id="axis" class="axis"><div class="rule"></div><div id="win" class="win"></div></div>
+  <ul id="tllist"></ul>
+</footer>
+
 <script>
 const $ = (id) => document.getElementById(id);
-const api = async (p, opt) => { const r = await fetch(p, opt); if (!r.ok) throw new Error((await r.json()).detail || r.status); return r.json(); };
-const csv = (s) => s.split(",").map(x => x.trim()).filter(Boolean);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let runId = null, days = [], poll = null;
+const csv = (s) => s.split(",").map(x => x.trim()).filter(Boolean);
+const api = async (p, opt) => { const r = await fetch(p, opt); if (!r.ok) { let d; try { d = (await r.json()).detail; } catch {} throw new Error(d || r.status); } return r.json(); };
+const fmt = (d) => d ? d.slice(5).replace("-", ".") : "날짜 미상";
+const REL = { MEMBER_OF:"소속", LEADS:"수장", REPRESENTS:"대표", MEETS:"회담", CRITICIZES:"비난", SUPPORTS:"지지", NEGOTIATES_WITH:"협상", ORDERS:"명령", SUCCEEDS:"후임", ALLIES_WITH:"협력", SANCTIONS:"제재", ATTACKS:"공격", AGREES_WITH:"합의", PARTICIPATES:"참여", OCCURS_AT:"장소" };
+const TYPE = { PERSON:"인물", ORG:"기관", COUNTRY:"국가", LOCATION:"지역" };
+const COLOR = { PERSON:"#2E5E9E", ORG:"#7C5CBF", COUNTRY:"#2F8F6B", LOCATION:"#B7791F" };
+const SHAPE = { PERSON:"ellipse", ORG:"round-rectangle", COUNTRY:"hexagon", LOCATION:"diamond" };
+const AFF = new Set(["MEMBER_OF", "LEADS", "REPRESENTS"]);
+const CORE_N = 20;
 
-const SHAPE = { PERSON: "ellipse", ORG: "round-rectangle", COUNTRY: "hexagon", LOCATION: "diamond" };
-const COLOR = { PERSON: "#2b6cb0", ORG: "#6b46c1", COUNTRY: "#2f855a", LOCATION: "#b7791f" };
+const S = { run:null, days:[], from:0, to:0, graphAll:null, eventsAll:[], graph:{ nodes:[], edges:[] }, events:[], mode:"core", personOnly:false, hideAff:false, poll:null, selEvent:null };
+
 const cy = cytoscape({
-  container: $("cy"),
+  container: $("cy"), wheelSensitivity: .2,
   style: [
-    { selector: "node", style: { label: "data(label)", "text-wrap": "wrap", "text-max-width": 120, "font-size": 11,
-        "text-valign": "bottom", "text-margin-y": 4, width: "data(size)", height: "data(size)",
-        shape: (n) => SHAPE[n.data("type")] || "ellipse", "background-color": (n) => COLOR[n.data("type")] || "#888" } },
-    { selector: "edge", style: { label: "data(label)", "font-size": 9, color: "#555", "curve-style": "bezier",
-        "target-arrow-shape": "triangle", width: "data(w)", "line-color": "#aaa", "target-arrow-color": "#aaa",
-        "text-rotation": "autorotate", "text-background-color": "#fff", "text-background-opacity": .8, "text-background-padding": 1 } },
-    { selector: ".highlight", style: { "border-width": 4, "border-color": "#e53e3e" } },
-    { selector: ".dim", style: { opacity: .25 } },
+    { selector:"node", style:{ label:"data(label)", "text-wrap":"wrap", "text-max-width":130, "font-size":11, "font-family":"IBM Plex Sans KR, sans-serif",
+        color:"#1C2733", "text-valign":"bottom", "text-margin-y":4, width:"data(size)", height:"data(size)",
+        shape:(n) => SHAPE[n.data("type")] || "ellipse", "background-color":(n) => COLOR[n.data("type")] || "#888", "border-width":0,
+        "text-background-color":"#fff", "text-background-opacity":.75, "text-background-padding":2 } },
+    { selector:"edge", style:{ label:"data(lab)", "font-size":9.5, "font-family":"IBM Plex Sans KR, sans-serif", color:"#5B6670", "curve-style":"bezier",
+        "target-arrow-shape":"triangle", width:"data(w)", "line-color":"data(col)", "target-arrow-color":"data(col)", "arrow-scale":.7, "line-opacity":"data(op)",
+        "text-rotation":"autorotate", "text-background-color":"#fff", "text-background-opacity":.85, "text-background-padding":1 } },
+    { selector:"edge[aff = 1]", style:{ "line-style":"dotted", "line-color":"#C9D1D9", "target-arrow-color":"#C9D1D9", label:"" } },
+    { selector:"edge:selected, edge.sel", style:{ label:"data(label)", "line-color":"#0F6E6E", "target-arrow-color":"#0F6E6E", "line-opacity":1, color:"#0F6E6E", "z-index":9 } },
+    { selector:"node.sel", style:{ "border-width":3, "border-color":"#0F6E6E" } },
+    { selector:".hl", style:{ "border-width":3, "border-color":"#1C2733" } },
+    { selector:".dim", style:{ opacity:.18 } },
   ],
 });
 
-async function loadRuns(selectId) {
+/* ---------- runs & form ---------- */
+async function loadRuns(select) {
   const runs = await api("/runs");
-  $("runs").innerHTML = '<option value="">선택</option>' + runs.map(r =>
-    `<option value="${esc(r.id)}">${esc(r.event_name)} · ${r.date_from}~${r.date_to} · ${esc(r.status)}</option>`).join("");
-  if (selectId) $("runs").value = selectId;
+  $("runs").innerHTML = '<option value="">과거 분석…</option>' + runs.map(r =>
+    `<option value="${esc(r.id)}">${esc(r.event_name)} (${r.date_from}~${r.date_to})${r.status === "done" ? "" : " · " + esc(r.status)}</option>`).join("");
+  if (select) $("runs").value = select;
+  return runs;
 }
-
+function showForm(open) { $("form").classList.toggle("open", open); $("new").setAttribute("aria-expanded", String(open)); }
+$("new").onclick = () => { const open = !$("form").classList.contains("open"); showForm(open); if (open) $("event").focus(); };
+$("runs").onchange = () => $("runs").value && watch($("runs").value);
 $("go").onclick = async () => {
-  const body = { event_name: $("event").value.trim(), date_from: $("from").value, date_to: $("to").value,
-    seed_persons: csv($("persons").value), seed_orgs: csv($("orgs").value), seed_countries: csv($("countries").value) };
-  if (!body.event_name || !body.date_from || !body.date_to) { $("status").textContent = "사건 이름과 기간은 필수입니다."; return; }
+  const body = { event_name:$("event").value.trim(), date_from:$("from").value, date_to:$("to").value,
+    seed_persons:csv($("persons").value), seed_orgs:csv($("orgs").value), seed_countries:csv($("countries").value) };
+  if (!body.event_name || !body.date_from || !body.date_to) return setStatus("사건 이름과 기간은 필수입니다.", true);
   $("go").disabled = true;
-  try { const r = await api("/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        await loadRuns(r.run_id); watch(r.run_id); }
-  catch (e) { $("status").textContent = "실행 실패: " + e.message; $("go").disabled = false; }
+  try { const r = await api("/runs", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) }); await loadRuns(r.run_id); watch(r.run_id); }
+  catch (e) { setStatus("시작하지 못했습니다: " + e.message, true); $("go").disabled = false; }
 };
-$("runs").onchange = () => { if ($("runs").value) watch($("runs").value); };
+function setStatus(t, err) { $("status").textContent = t; $("status").classList.toggle("err", !!err); }
 
 async function watch(id) {
-  runId = id; clearInterval(poll);
+  S.run = id; clearInterval(S.poll); showForm(true);
   const tick = async () => {
-    const r = await api(`/runs/${id}`);
-    const stage = { created: "대기", selecting: "선별 중", extracting: `추출 ${r.doc_extracted + r.doc_failed}/${r.doc_selected}` + (r.doc_failed ? ` (실패 ${r.doc_failed})` : ""),
-                    batching: "배치(Spark) 중", done: "완료" + (r.doc_failed ? ` (추출 실패 ${r.doc_failed}건)` : ""), failed: "실패" }[r.status] || r.status;
-    $("status").textContent = `${r.event_name} · 선별 ${r.doc_selected}건 → ${stage}` + (r.error ? ` · ${r.error}` : "") +
-      (r.expanded_keywords?.length ? ` · 키워드: ${r.expanded_keywords.slice(0, 12).join(", ")}` : "");
-    if (r.status === "done" || r.status === "failed") { clearInterval(poll); $("go").disabled = false; if (r.status === "done") await render(); }
+    const r = await api(`/runs/${encodeURIComponent(id)}`);
+    $("title").textContent = r.event_name; $("title").classList.remove("empty");
+    const stage = { created:"대기 중", selecting:"기사 고르는 중", extracting:`기사 읽는 중 ${r.doc_extracted}/${r.doc_selected}` + (r.doc_failed ? ` (실패 ${r.doc_failed})` : ""),
+      batching:"관계 합치는 중", done:"완료" + (r.doc_failed ? ` (추출 실패 ${r.doc_failed}건)` : ""), failed:"실패" }[r.status] || r.status;
+    setStatus(stage + (r.error ? ` · ${r.error}` : "") + (r.expanded_keywords?.length ? ` · 검색어: ${r.expanded_keywords.slice(0, 10).join(", ")}` : ""), r.status === "failed");
+    if (r.status === "done" || r.status === "failed") {
+      clearInterval(S.poll); $("go").disabled = false;
+      if (r.status === "done") { showForm(false); await load(r); }
+    }
   };
-  const safe = () => tick().catch(e => { $("status").textContent = "상태 조회 실패: " + e.message; });
-  await safe(); poll = setInterval(safe, 2000);
+  const safe = () => tick().catch(e => setStatus("상태를 가져오지 못했습니다: " + e.message, true));
+  await safe(); S.poll = setInterval(safe, 2000);
 }
 
-function dayRange(from, to) { const out = []; for (let d = new Date(from); d <= new Date(to); d.setDate(d.getDate() + 1)) out.push(d.toISOString().slice(0, 10)); return out; }
-
-async function render() {
-  const r = await api(`/runs/${runId}`);
-  days = dayRange(r.date_from, r.date_to);
-  $("s1").max = $("s2").max = days.length - 1; $("s1").value = 0; $("s2").value = days.length - 1;
+/* ---------- data ---------- */
+function dayRange(a, b) { const out = []; for (let d = new Date(a); d <= new Date(b); d.setDate(d.getDate() + 1)) out.push(d.toISOString().slice(0, 10)); return out; }
+async function load(run) {
+  S.days = dayRange(run.date_from, run.date_to); S.from = 0; S.to = S.days.length - 1; S.selEvent = null;
+  const rid = encodeURIComponent(S.run);
+  [S.graphAll, S.eventsAll] = await Promise.all([api(`/runs/${rid}/graph`), api(`/runs/${rid}/events`)]);
+  const c = { PERSON:0, ORG:0, COUNTRY:0, LOCATION:0 }; S.graphAll.nodes.forEach(n => c[n.type]++);
+  $("meta").textContent = `${run.date_from} – ${run.date_to} · 기사 ${run.doc_extracted}건 · 인물 ${c.PERSON} · 기관 ${c.ORG} · 국가 ${c.COUNTRY}`;
+  $("empty").hidden = true;
   await refresh();
 }
-$("s1").oninput = $("s2").oninput = () => { if (+$("s1").value > +$("s2").value) { const t = $("s1").value; $("s1").value = $("s2").value; $("s2").value = t; } refresh(); };
-
 async function refresh() {
-  const from = days[+$("s1").value], to = days[+$("s2").value];
-  $("r1").textContent = from; $("r2").textContent = to;
-  const q = `?from=${from}&to=${to}`;
-  const [g, ev] = await Promise.all([api(`/runs/${runId}/graph${q}`), api(`/runs/${runId}/events${q}`)]);
-  cy.elements().remove();
-  cy.add(g.nodes.map(n => ({ data: { id: "n" + n.id, eid: n.id, type: n.type, size: 18 + Math.min(40, 4 * n.degree),
-    label: n.name + (n.type === "PERSON" && n.affiliations.length ? "\n" + n.affiliations.slice(0, 2).map(a => a.name).join("·") : "") } })));
-  cy.add(g.edges.map(e => ({ data: { id: "e" + e.id, rid: e.id, source: "n" + e.src, target: "n" + e.dst,
-    label: e.type === "OTHER" ? e.raw_label : e.type, w: 1 + Math.log2(e.doc_count) } })));
-  cy.layout({ name: "cose", animate: false, nodeRepulsion: 9000, idealEdgeLength: 90 }).run();
-  $("timeline").innerHTML = ev.map(e => `<li data-id="${e.id}" data-p="${e.participants.map(p => p.id).join(",")}">
-    <div class="d">${e.date ?? "날짜 미상"} <span class="n">· 기사 ${e.doc_count}건</span></div>${esc(e.summary)}
-    <div class="n">${esc(e.participants.map(p => p.name).join(", "))}${e.location ? " @ " + esc(e.location) : ""}</div></li>`).join("") || "<li>이 기간의 사건이 없습니다.</li>";
-  $("detail-body").textContent = `노드 ${g.nodes.length} · 간선 ${g.edges.length} · 사건 ${ev.length}`;
+  const from = S.days[S.from], to = S.days[S.to];
+  const whole = S.from === 0 && S.to === S.days.length - 1;
+  $("period").hidden = whole; $("period").textContent = `보는 기간 ${fmt(from)} – ${fmt(to)}`;
+  const rid = encodeURIComponent(S.run);
+  if (whole) { S.graph = S.graphAll; S.events = S.eventsAll; }
+  else [S.graph, S.events] = await Promise.all([api(`/runs/${rid}/graph?from=${from}&to=${to}`), api(`/runs/${rid}/events?from=${from}&to=${to}`)]);
+  drawGraph(); drawTimeline();
+  $("notes").innerHTML = `<p class="hint">${whole ? "전체 기간" : `${fmt(from)} – ${fmt(to)}`} · 노드 ${S.graph.nodes.length} · 간선 ${S.graph.edges.length} · 사건 ${S.events.length}</p>`;
 }
 
-$("timeline").onclick = async (e) => {
-  const li = e.target.closest("li[data-id]"); if (!li) return;
-  document.querySelectorAll("#timeline li").forEach(x => x.classList.toggle("active", x === li));
-  const ids = new Set(li.dataset.p.split(",").filter(Boolean).map(x => "n" + x));
-  cy.elements().removeClass("highlight dim");
-  cy.nodes().forEach(n => n.addClass(ids.has(n.id()) ? "highlight" : "dim"));
-  cy.edges().addClass("dim");
-  const ev = await api(`/runs/${runId}/events/${li.dataset.id}/evidence`);
-  $("detail-body").innerHTML = `<b>사건</b> ${esc(li.querySelector(".d").textContent)}<br>` + evidenceHtml(ev);
-};
+/* ---------- graph ---------- */
+const nodeById = (id) => S.graph.nodes.find(n => n.id === id);
+function visibleSet() {
+  let nodes = S.graph.nodes, edges = S.graph.edges;
+  if (S.hideAff) edges = edges.filter(e => !AFF.has(e.type));
+  if (S.personOnly) { const p = new Set(nodes.filter(n => n.type === "PERSON").map(n => n.id)); edges = edges.filter(e => p.has(e.src) && p.has(e.dst)); }
+  const deg = {}; edges.forEach(e => { deg[e.src] = (deg[e.src] || 0) + 1; deg[e.dst] = (deg[e.dst] || 0) + 1; });
+  let keep = new Set(Object.keys(deg).map(Number));
+  if (S.mode === "core") {
+    const ranked = [...keep].sort((a, b) => (deg[b] - deg[a]) || ((nodeById(b)?.doc_count || 0) - (nodeById(a)?.doc_count || 0)));
+    keep = new Set(ranked.slice(0, CORE_N));
+    edges = edges.filter(e => keep.has(e.src) && keep.has(e.dst));
+  }
+  nodes = nodes.filter(n => keep.has(n.id));
+  return { nodes, edges, hidden:S.graph.nodes.length - nodes.length, deg };
+}
+const sup = (n) => String(n).replace(/\d/g, d => "⁰¹²³⁴⁵⁶⁷⁸⁹"[d]);
+function drawGraph() {
+  const v = visibleSet();
+  $("cap").textContent = `${S.mode === "core" ? "핵심" : "전체"} ${v.nodes.length} · 간선 ${v.edges.length}` + (v.hidden ? ` · 주변 ${v.hidden} 접힘` : "");
+  cy.elements().remove();
+  const labelMin = [...v.edges.map(e => e.doc_count)].sort((a, b) => b - a)[Math.min(v.edges.length, 28) - 1] || 1;  // label the ~28 strongest
+  cy.add(v.nodes.map(n => ({ data:{ id:"n" + n.id, eid:n.id, type:n.type, size:14 + Math.min(30, 2 * (v.deg[n.id] || 0)),
+    label:n.name + (n.type === "PERSON" && n.affiliations.length ? "\n" + n.affiliations.slice(0, 2).map(a => a.name).join(" · ") : "") } })));
+  cy.add(v.edges.map(e => ({ data:{ id:"e" + e.id, rid:e.id, type:e.type, aff:AFF.has(e.type) ? 1 : 0, source:"n" + e.src, target:"n" + e.dst,
+    kind:e.type === "OTHER" ? e.raw_label : REL[e.type] || e.type,
+    label:`${e.type === "OTHER" ? e.raw_label : REL[e.type] || e.type}${e.doc_count > 1 ? " " + sup(e.doc_count) : ""}`, w:1 + Math.log2(e.doc_count),
+    lab:e.doc_count >= labelMin && !AFF.has(e.type) ? `${e.type === "OTHER" ? e.raw_label : REL[e.type] || e.type}${e.doc_count > 1 ? " " + sup(e.doc_count) : ""}` : "",
+    col:e.doc_count >= labelMin ? "#8A97A5" : "#C9D1D9", op:e.doc_count >= labelMin ? .95 : .6 } })));
+  // rings by degree: the most connected in the middle, everyone else spread outward
+  const maxDeg = Math.max(1, ...v.nodes.map(n => v.deg[n.id] || 0));
+  cy.layout({ name:"concentric", animate:false, padding:40, startAngle:Math.PI / 2, minNodeSpacing:48, avoidOverlap:true,
+    concentric:(n) => v.deg[n.data("eid")] || 0, levelWidth:() => Math.max(1, Math.ceil(maxDeg / (S.mode === "core" ? 4 : 8))) }).run();
+}
+for (const [id, fn] of [["m-core", () => S.mode = "core"], ["m-all", () => S.mode = "all"], ["f-person", () => S.personOnly = !S.personOnly], ["f-aff", () => S.hideAff = !S.hideAff]]) {
+  $(id).onclick = () => { fn(); $("m-core").setAttribute("aria-pressed", S.mode === "core"); $("m-all").setAttribute("aria-pressed", S.mode === "all");
+    $("f-person").setAttribute("aria-pressed", S.personOnly); $("f-aff").setAttribute("aria-pressed", S.hideAff); drawGraph(); };
+}
 
-const evidenceHtml = (ev) => ev.map(v => `<div class="ev">${esc(v.sentence)}<div class="src">${v.evidence_date ? v.evidence_date + " · " : ""}` +
-  `<a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.title)}</a> · ${esc(v.press)} · ${String(v.writedate).slice(0, 10)}</div></div>`).join("") || "근거 없음";
-
-cy.on("tap", "node", async (e) => {
-  cy.elements().removeClass("highlight dim"); e.target.addClass("highlight");
-  const d = await api(`/runs/${runId}/entities/${e.target.data("eid")}`);
-  $("detail-body").innerHTML = `<b>${esc(d.name)}</b> <span class="tag">${d.type}</span> 기사 ${d.doc_count}건 · 연결 ${d.degree}<br>` +
-    `<div>별칭: ${d.surface_forms.map(esc).join(", ") || "-"}</div>` +
-    `<div>소속: ${d.affiliations.map(a => `${esc(a.name)}${a.role ? "(" + esc(a.role) + ")" : ""}${a.is_primary ? "★" : ""}`).join(", ") || "-"}</div>` +
-    `<div>관련 사건: ${d.events.map(x => `${x.date ?? "?"} ${esc(x.summary)}`).join(" / ") || "-"}</div>`;
-});
+/* ---------- notes (right column) ---------- */
+const source = (v) => `<small>${v.evidence_date ? fmt(v.evidence_date) + " · " : ""}${esc(v.press)} · <a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.title)}</a> · ${String(v.writedate).slice(0, 10)}</small>`;
+const footnotes = (ev) => ev.length ? `<ol>${ev.map(v => `<li>${esc(v.sentence)}${source(v)}</li>`).join("")}</ol>` : `<p class="hint">근거 문장이 없습니다.</p>`;
 cy.on("tap", "edge", async (e) => {
-  cy.elements().removeClass("highlight dim"); e.target.addClass("highlight");
-  const ev = await api(`/runs/${runId}/relations/${e.target.data("rid")}/evidence`);
-  $("detail-body").innerHTML = `<b>${esc(e.target.source().data("label").split("\n")[0])} → ${esc(e.target.target().data("label").split("\n")[0])}</b> <span class="tag">${esc(e.target.data("label"))}</span><br>` + evidenceHtml(ev);
+  select(e.target); const d = e.target.data();
+  const ev = await api(`/runs/${encodeURIComponent(S.run)}/relations/${d.rid}/evidence`);
+  const s = e.target.source().data("label").split("\n")[0], t = e.target.target().data("label").split("\n")[0];
+  $("notes").innerHTML = `<h4>${esc(s)} → ${esc(t)}</h4><div class="rel">${esc(d.kind)} · 근거 ${ev.length}건</div>${footnotes(ev)}`;
 });
-cy.on("tap", (e) => { if (e.target === cy) cy.elements().removeClass("highlight dim"); });
+cy.on("tap", "node", async (e) => {
+  select(e.target);
+  const d = await api(`/runs/${encodeURIComponent(S.run)}/entities/${e.target.data("eid")}`);
+  $("notes").innerHTML = `<h4>${esc(d.name)}<span class="tag">${TYPE[d.type] || d.type}</span></h4><div class="rel">기사 ${d.doc_count}건 · 연결 ${d.degree}</div>
+    <dl><dt>별칭</dt><dd>${d.surface_forms.map(esc).join(", ") || "-"}</dd>
+    <dt>소속</dt><dd>${d.affiliations.map(a => `${esc(a.name)}${a.role ? " (" + esc(a.role) + ")" : ""}${a.is_primary ? " ★" : ""}`).join(", ") || "-"}</dd>
+    <dt>관련 사건</dt><dd>${d.events.length ? d.events.map(x => `${fmt(x.date)} ${esc(x.summary)}`).join("<br>") : "-"}</dd></dl>`;
+});
+cy.on("tap", (e) => { if (e.target === cy) { cy.elements().removeClass("sel hl dim"); S.selEvent = null; drawTimeline(); } });
+function select(el) { cy.elements().removeClass("sel hl dim"); el.addClass("sel"); S.selEvent = null; drawTimeline(); }
 
-loadRuns().then(() => { const first = $("runs").options[1]; if (first) { $("runs").value = first.value; watch(first.value); } });
+/* ---------- timeline ---------- */
+const inWindow = (d) => d && S.days.indexOf(d) >= S.from && S.days.indexOf(d) <= S.to;
+function drawTimeline() {
+  const dated = S.events.filter(e => e.date && S.days.includes(e.date));
+  const undated = S.events.length - dated.length;
+  $("tlcap").textContent = `${S.events.length}건${undated ? ` (날짜 미상·기간 밖 ${undated})` : ""} · 점 크기 = 기사 수 · 축을 끌어 기간 선택, 두 번 클릭으로 해제`;
+  const axis = $("axis"); axis.querySelectorAll(".ev,.lbl,.day").forEach(x => x.remove());
+  const n = S.days.length, x = (d) => ((S.days.indexOf(d) + 0.5) / n) * 100;
+  const step = Math.max(1, Math.ceil(n / 9));
+  S.days.forEach((d, i) => { if (i % step === 0 || i === n - 1) { const el = document.createElement("span"); el.className = "day"; el.style.left = x(d) + "%"; el.textContent = fmt(d); axis.appendChild(el); } });
+  const max = Math.max(1, ...dated.map(e => e.doc_count));
+  // at most 6 dots per day (largest first); the list view has every event
+  const perDay = {}; [...dated].sort((a, b) => b.doc_count - a.doc_count).forEach(e => { (perDay[e.date] ||= []).push(e); });
+  const seen = {};
+  Object.values(perDay).flatMap(l => l.slice(0, 6)).forEach(e => {
+    const k = seen[e.date] = (seen[e.date] || 0) + 1, jitter = [0, -9, 9, -18, 18, -27][k - 1];
+    const dot = document.createElement("i"); dot.className = "ev" + (inWindow(e.date) ? " on" : "") + (S.selEvent === e.id ? " sel" : "");
+    const sz = 7 + 13 * Math.sqrt(e.doc_count / max); dot.style.cssText = `left:calc(${x(e.date)}% + ${jitter}px);width:${sz}px;height:${sz}px`;
+    dot.title = `${fmt(e.date)} ${e.summary} (${e.doc_count}건)`; dot.dataset.id = e.id; axis.appendChild(dot);
+  });
+  const labeled = [...dated].sort((a, b) => b.doc_count - a.doc_count).slice(0, Math.min(8, Math.max(2, Math.floor(n * 1.2))));
+  let row = 0;
+  labeled.sort((a, b) => a.date.localeCompare(b.date)).forEach(e => {
+    const l = document.createElement("div"); l.className = "lbl " + (row++ % 2 ? "r2" : "r1"); l.style.left = x(e.date) + "%";
+    l.innerHTML = `<b>${fmt(e.date)}</b>${esc(e.summary)}`; l.title = e.summary; axis.appendChild(l);
+  });
+  $("win").style.left = (S.from / n) * 100 + "%"; $("win").style.width = ((S.to - S.from + 1) / n) * 100 + "%";
+  $("tllist").innerHTML = S.events.map(e => `<li data-id="${e.id}" class="${inWindow(e.date) ? "on" : ""}${S.selEvent === e.id ? " sel" : ""}"><b>${fmt(e.date)}</b>${esc(e.summary)}<span>${esc(e.participants.map(p => p.name).join(", "))}${e.location ? " @ " + esc(e.location) : ""} · ${e.doc_count}건</span></li>`).join("") || "<li>이 기간의 사건이 없습니다.</li>";
+}
+let drag = null;
+const dayAt = (ev) => { const r = $("axis").getBoundingClientRect(); return Math.min(S.days.length - 1, Math.max(0, Math.floor(((ev.clientX - r.left) / r.width) * S.days.length))); };
+$("axis").addEventListener("pointerdown", (ev) => { if (ev.target.classList.contains("ev") || !S.days.length) return; drag = dayAt(ev); S.from = S.to = drag; drawTimeline(); $("axis").setPointerCapture(ev.pointerId); });
+$("axis").addEventListener("pointermove", (ev) => { if (drag === null) return; const d = dayAt(ev); S.from = Math.min(drag, d); S.to = Math.max(drag, d); drawTimeline(); });
+$("axis").addEventListener("pointerup", () => { if (drag === null) return; drag = null; refresh(); });
+$("axis").addEventListener("dblclick", () => { if (!S.days.length) return; S.from = 0; S.to = S.days.length - 1; refresh(); });
+$("axis").addEventListener("click", (ev) => { const id = ev.target.dataset?.id; if (id) pickEvent(+id); });
+$("tllist").addEventListener("click", (ev) => { const li = ev.target.closest("li[data-id]"); if (li) pickEvent(+li.dataset.id); });
+$("tlmode").onclick = () => { const list = $("tl").classList.toggle("list"); $("tlmode").textContent = list ? "축으로 보기" : "목록으로 보기"; };
+async function pickEvent(id) {
+  S.selEvent = id; drawTimeline();
+  const e = S.events.find(x => x.id === id); if (!e) return;
+  const ids = new Set(e.participants.map(p => "n" + p.id));
+  cy.elements().removeClass("sel hl dim"); cy.nodes().forEach(n => n.addClass(ids.has(n.id()) ? "hl" : "dim")); cy.edges().addClass("dim");
+  const ev = await api(`/runs/${encodeURIComponent(S.run)}/events/${id}/evidence`);
+  $("notes").innerHTML = `<h4>${fmt(e.date)} ${esc(e.summary)}</h4><div class="rel">${esc(e.participants.map(p => p.name).join(", ")) || "참여자 미상"}${e.location ? " @ " + esc(e.location) : ""} · 근거 ${ev.length}건</div>${footnotes(ev)}`;
+}
+
+/* ---------- boot ---------- */
+loadRuns().then(runs => { const done = runs.find(r => r.status === "done"); if (done) { $("runs").value = done.id; watch(done.id); } else showForm(true); });
 </script>
 </body>
 </html>

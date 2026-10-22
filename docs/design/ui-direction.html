@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EventGraph 디자인 방향</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #ECEEF1; color: #1B232B; font: 15px/1.5 "Pretendard Variable", "IBM Plex Sans KR", sans-serif; padding: 28px 32px 60px; }
+  h2 { font-size: 22px; margin: 0 0 4px; font-weight: 600; }
+  .sub { color: #5B6670; margin: 0 0 24px; }
+  .dir { background: #fff; border: 1.5px solid #D5DAE0; border-radius: 10px; margin-bottom: 26px; overflow: hidden; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+  .dir.selected { border-color: #0F6E6E; box-shadow: 0 0 0 3px rgba(15,110,110,.18); }
+  .dir header { display: flex; gap: 16px; align-items: baseline; padding: 14px 18px 10px; }
+  .dir header .k { font-weight: 700; font-size: 18px; width: 28px; }
+  .dir header h3 { margin: 0; font-size: 17px; font-weight: 600; }
+  .dir header p { margin: 0; color: #5B6670; font-size: 13.5px; }
+  .shot { position: relative; width: 100%; aspect-ratio: 16 / 8.2; overflow: hidden; }
+  .notes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 12px 18px 16px; font-size: 13px; color: #3C4752; border-top: 1px solid #E6E9ED; }
+  .notes b { display: block; color: #1B232B; margin-bottom: 2px; font-weight: 600; }
+  svg text { font-family: inherit; }
+
+  /* ---------- A: 상황실 ---------- */
+  .A { background: #141C25; color: #E3E9EF; font-family: "Pretendard Variable", sans-serif; display: grid; grid-template-columns: 1fr 340px; grid-template-rows: 46px 1fr 92px; height: 100%; }
+  .A .top { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; padding: 0 18px; border-bottom: 1px solid #253241; font-size: 13px; }
+  .A .top .ev { font-size: 15px; font-weight: 600; color: #fff; }
+  .A .top .chip { background: #1F2B38; padding: 3px 10px; border-radius: 999px; color: #B7C3CF; }
+  .A .top .chip.on { background: #F2B33D; color: #141C25; font-weight: 600; }
+  .A .graph { position: relative; background: radial-gradient(ellipse at 45% 50%, #1B2632 0%, #141C25 70%); }
+  .A .ctl { position: absolute; left: 14px; top: 12px; display: flex; gap: 8px; font-size: 12px; }
+  .A .ctl span { background: #1F2B38; border: 1px solid #2D3B4A; padding: 4px 9px; border-radius: 6px; color: #C8D2DC; }
+  .A .ctl span.on { border-color: #F2B33D; color: #F2B33D; }
+  .A .rail { border-left: 1px solid #253241; background: #182230; padding: 14px 16px; font-size: 12.5px; overflow: hidden; }
+  .A .rail h4 { margin: 0 0 2px; font-size: 14px; color: #fff; font-weight: 600; }
+  .A .rail .rel { color: #F2B33D; font-weight: 600; font-size: 12px; margin-bottom: 10px; }
+  .A .rail .q { border-left: 2px solid #2D3B4A; padding: 6px 0 6px 10px; margin-bottom: 8px; color: #D5DDE5; }
+  .A .rail .q small { display: block; color: #8A97A5; margin-top: 3px; }
+  .A .rail .q small u { text-decoration: none; color: #9DC3F2; }
+  .A .tl { grid-column: 1 / -1; border-top: 1px solid #253241; background: #182230; padding: 8px 18px 6px; position: relative; }
+  .A .tl .bars { display: flex; align-items: flex-end; gap: 3px; height: 34px; }
+  .A .tl .bars i { flex: 1; background: #2D3B4A; border-radius: 2px 2px 0 0; }
+  .A .tl .bars i.on { background: #F2B33D; }
+  .A .tl .days { display: flex; justify-content: space-between; font-size: 11px; color: #8A97A5; margin-top: 4px; }
+  .A .tl .pill { position: absolute; left: 44%; top: 10px; background: #F2B33D; color: #141C25; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 6px; }
+
+  /* ---------- B: 분석 노트 ---------- */
+  .B { background: #EEF1F4; color: #1C2733; font-family: "IBM Plex Sans KR", sans-serif; display: grid; grid-template-columns: 220px 1fr 360px; height: 100%; }
+  .B .side { background: #fff; border-right: 1px solid #D9DFE5; padding: 16px 14px; font-size: 12.5px; }
+  .B .side h1 { font: 700 20px/1.2 "Noto Serif KR", serif; margin: 0 0 2px; }
+  .B .side .range { color: #5B6670; margin-bottom: 14px; }
+  .B .side .ti { position: relative; padding: 6px 0 6px 16px; border-left: 2px solid #D9DFE5; }
+  .B .side .ti::before { content: ""; position: absolute; left: -5px; top: 11px; width: 8px; height: 8px; border-radius: 50%; background: #D9DFE5; }
+  .B .side .ti.on { border-left-color: #0F6E6E; } .B .side .ti.on::before { background: #0F6E6E; }
+  .B .side .ti b { display: block; font-weight: 600; color: #0F6E6E; font-size: 12px; }
+  .B .plate { margin: 16px; background: #fff; border: 1px solid #D9DFE5; position: relative; overflow: hidden; }
+  .B .plate .cap { position: absolute; left: 14px; top: 10px; font: 700 15px "Noto Serif KR", serif; }
+  .B .plate .cap small { display: block; font: 400 12px "IBM Plex Sans KR", sans-serif; color: #5B6670; }
+  .B .plate .leg { position: absolute; right: 14px; top: 12px; font-size: 11.5px; color: #5B6670; display: flex; gap: 10px; }
+  .B .plate .leg i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+  .B .foot { background: #fff; border-left: 1px solid #D9DFE5; padding: 16px 18px; font-size: 12.5px; }
+  .B .foot h4 { font: 700 15px "Noto Serif KR", serif; margin: 0; }
+  .B .foot .rel { color: #0F6E6E; margin: 2px 0 12px; font-weight: 600; }
+  .B .foot ol { margin: 0; padding-left: 20px; }
+  .B .foot li { margin-bottom: 9px; color: #2A3540; }
+  .B .foot li small { display: block; color: #6B7680; }
+
+  /* ---------- C: 지도 ---------- */
+  .C { background: #E8EDE6; color: #223127; font-family: "Pretendard Variable", sans-serif; height: 100%; position: relative; }
+  .C .bar { position: absolute; left: 0; right: 0; top: 0; height: 52px; background: #fff; border-bottom: 1px solid #D3DBD0; display: flex; align-items: center; padding: 0 18px; gap: 14px; }
+  .C .bar b { font-size: 15px; font-weight: 600; }
+  .C .scrub { flex: 1; position: relative; height: 26px; }
+  .C .scrub .line { position: absolute; left: 0; right: 0; top: 12px; height: 2px; background: #C8D1C4; }
+  .C .scrub .win { position: absolute; left: 60%; width: 16%; top: 6px; height: 14px; border: 2px solid #2E6F9E; border-radius: 4px; background: rgba(46,111,158,.12); }
+  .C .scrub .t { position: absolute; top: 9px; width: 8px; height: 8px; border-radius: 50%; background: #2E6F9E; }
+  .C .scrub .t.s { width: 5px; height: 5px; top: 10.5px; background: #8FA5B5; }
+  .C .dates { font-size: 11.5px; color: #5E6B63; }
+  .C .ring { position: absolute; border: 1px dashed #C1CCBC; border-radius: 50%; }
+  .C .card { position: absolute; width: 300px; background: #fff; border-radius: 8px; box-shadow: 0 8px 28px rgba(34,49,39,.18); padding: 12px 14px; font-size: 12.5px; }
+  .C .card h4 { margin: 0 0 2px; font-size: 13.5px; font-weight: 600; }
+  .C .card .rel { color: #2E6F9E; font-weight: 600; margin-bottom: 8px; }
+  .C .card p { margin: 0 0 7px; color: #2A3A30; }
+  .C .card p small { display: block; color: #6B7A70; }
+  .C .card .more { color: #2E6F9E; font-size: 12px; }
+  .C .leg { position: absolute; left: 18px; bottom: 14px; font-size: 11.5px; color: #5E6B63; display: flex; gap: 12px; }
+  .C .leg i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<h2>어느 방향으로 갈까요?</h2>
+<p class="sub">세 시안 모두 실제 호르무즈 run 데이터입니다. 공통으로 세 가지를 고칩니다: 인상(팔레트·서체), 노드 뭉침(중심 인물만 먼저 보이고 주변은 접기), 근거 패널(아래가 아니라 항상 보이는 자리). 클릭해서 고르시고, 터미널에 섞고 싶은 요소를 적어 주세요.</p>
+
+<!-- ============ A ============ -->
+<div class="dir" data-choice="A" onclick="toggleSelect(this)">
+  <header><span class="k">A</span><div><h3>상황실</h3><p>어두운 바탕에 그래프가 주인공. 근거는 오른쪽 레일에 고정, 타임라인은 아래 기사 밀도 막대. 깊이·긴박감.</p></div></header>
+  <div class="shot"><div class="A">
+    <div class="top"><span class="ev">미국-이란 호르무즈 사태</span><span class="chip">06.24 – 07.02</span><span class="chip on">06.30 – 07.01</span><span class="chip">인물 12 · 기관 6 · 국가 7</span><span style="margin-left:auto;color:#8A97A5">기사 300건 · 간선 200</span></div>
+    <div class="graph">
+      <div class="ctl"><span class="on">핵심 20</span><span>전체 197</span><span>인물만</span><span>소속 간선 숨김</span></div>
+      <svg viewBox="0 0 760 420" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
+        <defs><marker id="ma" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5B6B7C"/></marker></defs>
+        <g stroke="#3A4B5D" fill="none" marker-end="url(#ma)">
+          <path d="M300 200 L440 210" stroke-width="6" stroke="#F2B33D"/>
+          <path d="M300 200 L250 110" stroke-width="2"/><path d="M440 210 L520 120" stroke-width="3"/>
+          <path d="M300 200 L170 260" stroke-width="2"/><path d="M440 210 L600 250" stroke-width="2.5"/>
+          <path d="M250 110 L440 210" stroke-width="2"/><path d="M520 120 L600 250" stroke-width="1.5"/>
+          <path d="M300 200 L330 330" stroke-width="1.5"/><path d="M440 210 L420 330" stroke-width="2"/>
+          <path d="M600 250 L650 340" stroke-width="1"/><path d="M170 260 L140 350" stroke-width="1"/>
+        </g>
+        <g font-size="10" fill="#F2B33D" font-weight="600"><text x="356" y="196">협상(24)</text></g>
+        <g font-size="9.5" fill="#8A97A5"><text x="300" y="150">비난</text><text x="496" y="160">공격</text><text x="220" y="240">회담</text><text x="530" y="236">지지</text><text x="300" y="270">명령</text><text x="445" y="275">제재</text></g>
+        <g font-size="11.5" fill="#E3E9EF" text-anchor="middle">
+          <polygon points="300,170 326,185 326,215 300,230 274,215 274,185" fill="#2F8F6B" stroke="#F2B33D" stroke-width="2"/><text x="300" y="252">미국</text>
+          <polygon points="440,180 466,195 466,225 440,240 414,225 414,195" fill="#2F8F6B" stroke="#F2B33D" stroke-width="2"/><text x="440" y="262">이란</text>
+          <circle cx="250" cy="110" r="22" fill="#3D7FD6"/><text x="250" y="86">도널드 트럼프</text><text x="250" y="150" fill="#8A97A5" font-size="10">미국 · 대통령</text>
+          <circle cx="520" cy="120" r="18" fill="#3D7FD6"/><text x="520" y="96">아바스 아라그치</text><text x="520" y="156" fill="#8A97A5" font-size="10">이란 · 외무장관</text>
+          <circle cx="170" cy="260" r="16" fill="#3D7FD6"/><text x="170" y="292">스티브 위트코프</text>
+          <polygon points="600,228 620,239 620,261 600,272 580,261 580,239" fill="#2F8F6B"/><text x="600" y="292">카타르</text>
+          <rect x="406" y="316" width="30" height="24" rx="4" fill="#8E6BD6"/><text x="421" y="360">혁명수비대</text>
+          <rect x="316" y="318" width="28" height="22" rx="4" fill="#8E6BD6"/><text x="330" y="358">중부사령부</text>
+          <circle cx="650" cy="340" r="11" fill="#3D7FD6" opacity=".55"/><text x="650" y="364" opacity=".6">알사니</text>
+          <circle cx="140" cy="350" r="10" fill="#3D7FD6" opacity=".55"/><text x="140" y="374" opacity=".6">쿠슈너</text>
+          <g opacity=".22" fill="#3D7FD6"><circle cx="80" cy="90" r="6"/><circle cx="700" cy="70" r="6"/><circle cx="60" cy="200" r="5"/><circle cx="720" cy="180" r="5"/><circle cx="90" cy="400" r="5"/><circle cx="560" cy="400" r="5"/><circle cx="380" cy="60" r="5"/></g>
+          <text x="690" y="400" fill="#8A97A5" font-size="10.5" text-anchor="end">주변 인물 177 접힘 — 펼치기</text>
+        </g>
+      </svg>
+    </div>
+    <div class="rail">
+      <h4>미국 → 이란</h4><div class="rel">협상 · 근거 기사 24건 · 06.24 – 07.01</div>
+      <div class="q">미국과 이란이 호르무즈 해협에서 격화하고 있는 무력 충돌을 일단 중단하고 30일 카타르 수도 도하에서 후속 회담을 하기로 했다는 보도가 나왔다.<small>06.29 · kmib.co.kr · <u>“美·이란, 호르무즈 충돌 중단하고 30일 회담”</u></small></div>
+      <div class="q">양측은 핵 문제와 같은 핵심 쟁점은 2단계 협상으로 넘기고 우선 호르무즈 해협의 안전한 항행에 집중하기로.<small>06.30 · hankyung.com · <u>[외신 에스프레소] 美·이란 교전 중단 합의</u></small></div>
+      <div class="q">미국이 이란 전쟁을 끝내기 위한 양해각서에 따라 이란산 원유 수출 제재를 한시적으로 면제하면서…<small>06.24 · yna.co.kr · <u>“美 원유 제재 면제로 이란 60일간 최대 4조7천억원”</u></small></div>
+    </div>
+    <div class="tl">
+      <div class="pill">06.30 미·이란 도하 회담 · 기사 24건</div>
+      <div class="bars"><i style="height:30%"></i><i style="height:45%"></i><i style="height:38%"></i><i style="height:70%"></i><i style="height:85%"></i><i style="height:60%"></i><i class="on" style="height:100%"></i><i class="on" style="height:72%"></i><i style="height:40%"></i></div>
+      <div class="days"><span>06.24</span><span>06.26</span><span>06.28</span><span>06.30</span><span>07.02</span></div>
+    </div>
+  </div></div>
+  <div class="notes">
+    <div><b>인상</b>깊은 남색 바탕 + 호박색 강조 하나. Pretendard. 그래프가 화면의 70%.</div>
+    <div><b>노드 뭉침</b>기본은 "핵심 20"만. 나머지 177은 흐린 점으로 접혀 있고 한 번에 펼침. 간선 굵기 = 기사 수.</div>
+    <div><b>근거</b>오른쪽 레일에 항상 고정. 간선/사건 클릭 시 레일이 바뀜. 타임라인은 아래 밀도 막대 + 구간 드래그.</div>
+  </div>
+</div>
+
+<!-- ============ B ============ -->
+<div class="dir" data-choice="B" onclick="toggleSelect(this)">
+  <header><span class="k">B</span><div><h3>분석 노트</h3><p>밝은 종이 느낌, 세리프 제목. 왼쪽은 날짜 순 사건, 가운데 그래프는 액자(plate), 오른쪽은 각주처럼 번호 붙은 근거.</p></div></header>
+  <div class="shot"><div class="B">
+    <div class="side">
+      <h1>호르무즈 사태</h1><div class="range">2026.06.24 – 07.02 · 300건</div>
+      <div class="ti"><b>06.25</b>이란, 호르무즈 통과 상선 드론 공격</div>
+      <div class="ti"><b>06.26</b>미군, 이란 미사일·레이더 시설 타격</div>
+      <div class="ti"><b>06.27</b>혁명수비대, 쿠웨이트·바레인 미군기지 공격</div>
+      <div class="ti on"><b>06.30</b>미·이란 도하에서 후속 회담 — 24건</div>
+      <div class="ti"><b>07.01</b>동결자금 해제 두고 이란·카타르 설명 엇갈려</div>
+    </div>
+    <div class="plate">
+      <div class="cap">관계도 <small>핵심 인물 12 · 06.30 – 07.01</small></div>
+      <div class="leg"><span><i style="background:#2E5E9E"></i>인물</span><span><i style="background:#2F8F6B"></i>국가</span><span><i style="background:#7C5CBF"></i>기관</span></div>
+      <svg viewBox="80 40 500 340" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;padding-top:44px">
+        <g stroke="#AEB8C2" fill="none">
+          <path d="M230 200 L370 210" stroke-width="5" stroke="#0F6E6E"/>
+          <path d="M230 200 L190 110" stroke-width="2"/><path d="M370 210 L440 120" stroke-width="2.5"/>
+          <path d="M230 200 L120 260" stroke-width="1.5"/><path d="M370 210 L500 250" stroke-width="2"/>
+          <path d="M190 110 L370 210" stroke-width="1.5"/><path d="M230 200 L260 320" stroke-width="1.5"/><path d="M370 210 L350 320" stroke-width="2"/>
+        </g>
+        <g font-size="10" fill="#0F6E6E" font-weight="600"><text x="282" y="196">협상 ¹²³</text></g>
+        <g font-size="9.5" fill="#6B7680"><text x="236" y="150">비난</text><text x="416" y="160">공격</text><text x="160" y="240">회담</text><text x="440" y="236">지지</text></g>
+        <g font-size="11.5" fill="#1C2733" text-anchor="middle">
+          <polygon points="230,172 254,186 254,214 230,228 206,214 206,186" fill="#2F8F6B"/><text x="230" y="248">미국</text>
+          <polygon points="370,182 394,196 394,224 370,238 346,224 346,196" fill="#2F8F6B"/><text x="370" y="258">이란</text>
+          <circle cx="190" cy="110" r="21" fill="#2E5E9E"/><text x="190" y="86">도널드 트럼프</text><text x="190" y="146" fill="#6B7680" font-size="10">미국 · 대통령</text>
+          <circle cx="440" cy="120" r="17" fill="#2E5E9E"/><text x="440" y="96">아바스 아라그치</text><text x="440" y="152" fill="#6B7680" font-size="10">이란 · 외무장관</text>
+          <circle cx="120" cy="260" r="15" fill="#2E5E9E"/><text x="120" y="290">스티브 위트코프</text>
+          <polygon points="500,230 519,241 519,263 500,274 481,263 481,241" fill="#2F8F6B"/><text x="500" y="292">카타르</text>
+          <rect x="336" y="308" width="28" height="22" rx="3" fill="#7C5CBF"/><text x="350" y="348">혁명수비대</text>
+          <rect x="246" y="308" width="28" height="22" rx="3" fill="#7C5CBF"/><text x="260" y="348">중부사령부</text>
+          <text x="590" y="372" fill="#6B7680" font-size="10.5" text-anchor="end">+ 주변 185 보기</text>
+        </g>
+      </svg>
+    </div>
+    <div class="foot">
+      <h4>미국 → 이란</h4><div class="rel">협상 · 24건</div>
+      <ol>
+        <li>미국과 이란이 호르무즈 해협에서 격화하고 있는 무력 충돌을 일단 중단하고 30일 카타르 수도 도하에서 후속 회담을 하기로 했다는 보도가 나왔다.<small>국민일보, 06.29</small></li>
+        <li>양측은 핵 문제와 같은 핵심 쟁점은 2단계 협상으로 넘기고 우선 호르무즈 해협의 안전한 항행과 군사 충돌 방지에 집중하기로.<small>한국경제, 06.30</small></li>
+        <li>미국이 이란 전쟁을 끝내기 위한 양해각서에 따라 이란산 원유 수출에 대한 제재를 한시적으로 면제하면서…<small>연합뉴스, 06.24</small></li>
+        <li>미·이란 대표단은 지난달 30일 중재국 카타르 도하에 함께 머물면서도 직접 협상 테이블에는 앉지 않았다.<small>조선비즈, 07.01</small></li>
+      </ol>
+    </div>
+  </div></div>
+  <div class="notes">
+    <div><b>인상</b>차가운 회백색 + 청록 강조. Noto Serif KR 제목, IBM Plex Sans KR 본문. 보고서를 펼친 느낌.</div>
+    <div><b>노드 뭉침</b>핵심 인물만 액자 안에. 간선 라벨에 근거 번호(¹²³)가 붙어 오른쪽 각주와 연결.</div>
+    <div><b>근거</b>오른쪽 열이 번호 붙은 각주. 타임라인은 왼쪽 세로 목록으로 항상 보임.</div>
+  </div>
+</div>
+
+<!-- ============ C ============ -->
+<div class="dir" data-choice="C" onclick="toggleSelect(this)">
+  <header><span class="k">C</span><div><h3>지도</h3><p>옅은 세이지 바탕, 씨앗 인물을 중심으로 동심원 배치. 위에 날짜 스크러버, 근거는 클릭한 간선 옆에 뜨는 카드.</p></div></header>
+  <div class="shot"><div class="C">
+    <div class="bar"><b>미국-이란 호르무즈 사태</b>
+      <div class="scrub"><div class="line"></div><span class="t s" style="left:4%"></span><span class="t" style="left:14%"></span><span class="t" style="left:26%"></span><span class="t s" style="left:33%"></span><span class="t" style="left:42%"></span><span class="t" style="left:55%"></span><span class="t" style="left:66%"></span><span class="t s" style="left:74%"></span><span class="t" style="left:88%"></span><div class="win"></div></div>
+      <span class="dates">06.30 – 07.01 · 사건 39</span></div>
+    <div class="ring" style="left:50%;top:56%;width:160px;height:160px;transform:translate(-50%,-50%)"></div>
+    <div class="ring" style="left:50%;top:56%;width:340px;height:340px;transform:translate(-50%,-50%)"></div>
+    <div class="ring" style="left:50%;top:56%;width:560px;height:560px;transform:translate(-50%,-50%)"></div>
+    <svg viewBox="0 0 1000 480" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;padding-top:52px">
+      <g stroke="#A9B6A5" fill="none">
+        <path d="M470 250 L530 250" stroke-width="5" stroke="#2E6F9E"/>
+        <path d="M470 250 L400 190" stroke-width="2"/><path d="M530 250 L600 190" stroke-width="2.5"/>
+        <path d="M470 250 L380 300" stroke-width="1.5"/><path d="M530 250 L620 310" stroke-width="2"/>
+        <path d="M400 190 L530 250" stroke-width="1.5"/><path d="M470 250 L430 350" stroke-width="1.5"/><path d="M530 250 L560 350" stroke-width="2"/>
+        <path d="M600 190 L700 150" stroke-width="1"/><path d="M380 300 L300 340" stroke-width="1"/><path d="M620 310 L720 330" stroke-width="1"/>
+      </g>
+      <g font-size="11.5" fill="#223127" text-anchor="middle">
+        <circle cx="470" cy="250" r="20" fill="#2E6F9E" stroke="#fff" stroke-width="2"/><text x="470" y="284" font-weight="600">트럼프</text>
+        <polygon points="530,228 549,239 549,261 530,272 511,261 511,239" fill="#4F8A6E" stroke="#fff" stroke-width="2"/><text x="530" y="290" font-weight="600">이란</text>
+        <polygon points="400,170 418,180 418,200 400,210 382,200 382,180" fill="#4F8A6E"/><text x="400" y="160">미국</text>
+        <circle cx="600" cy="190" r="15" fill="#2E6F9E"/><text x="600" y="172">아라그치</text>
+        <circle cx="380" cy="300" r="13" fill="#2E6F9E"/><text x="380" y="326">위트코프</text>
+        <polygon points="620,294 636,303 636,321 620,330 604,321 604,303" fill="#4F8A6E"/><text x="620" y="348">카타르</text>
+        <rect x="418" y="340" width="24" height="20" rx="3" fill="#8A6CB9"/><text x="430" y="378">중부사령부</text>
+        <rect x="548" y="340" width="24" height="20" rx="3" fill="#8A6CB9"/><text x="560" y="378">혁명수비대</text>
+        <circle cx="700" cy="150" r="9" fill="#2E6F9E" opacity=".6"/><text x="700" y="136" opacity=".7">알사니</text>
+        <circle cx="300" cy="340" r="9" fill="#2E6F9E" opacity=".6"/><text x="300" y="364" opacity=".7">쿠슈너</text>
+        <circle cx="720" cy="330" r="9" fill="#4F8A6E" opacity=".6"/><text x="720" y="354" opacity=".7">오만</text>
+        <g opacity=".25" fill="#2E6F9E"><circle cx="220" cy="120" r="5"/><circle cx="800" cy="100" r="5"/><circle cx="180" cy="420" r="5"/><circle cx="830" cy="420" r="5"/><circle cx="500" cy="60" r="4"/><circle cx="880" cy="250" r="5"/><circle cx="130" cy="260" r="5"/></g>
+      </g>
+    </svg>
+    <div class="card" style="left:56%;top:40%">
+      <h4>트럼프 → 이란</h4><div class="rel">협상 · 24건</div>
+      <p>미국과 이란이 호르무즈 해협에서 격화하고 있는 무력 충돌을 일단 중단하고 30일 카타르 수도 도하에서 후속 회담을 하기로…<small>06.29 · 국민일보</small></p>
+      <p>양측은 핵 문제와 같은 핵심 쟁점은 2단계 협상으로 넘기고 우선 호르무즈 해협의 안전한 항행에 집중하기로.<small>06.30 · 한국경제</small></p>
+      <span class="more">근거 22건 더 보기</span>
+    </div>
+    <div class="leg"><span><i style="background:#2E6F9E"></i>인물</span><span><i style="background:#4F8A6E"></i>국가</span><span><i style="background:#8A6CB9"></i>기관</span><span>안쪽 원 = 입력한 씨앗, 바깥 원 = 연결 거리</span></div>
+  </div></div>
+  <div class="notes">
+    <div><b>인상</b>옅은 세이지 + 강청색. 동심원 가이드가 지도처럼 거리를 보여줌.</div>
+    <div><b>노드 뭉침</b>씨앗 인물이 중심, 거리별 원에 배치되어 뭉치지 않음. 3단계 밖은 점으로.</div>
+    <div><b>근거</b>간선 클릭 시 그 자리에 카드. 타임라인은 상단 스크러버(사건 눈금 + 구간 창).</div>
+  </div>
+</div>
+<script>
+function toggleSelect(el){document.querySelectorAll('.dir').forEach(d=>d.classList.toggle('selected',d===el));}
+</script>
+</body>
+</html>
