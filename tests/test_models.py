@@ -9,7 +9,8 @@ def _ents():
 
 
 def test_relation_types_match_schema_seed():
-    assert len(RELATION_TYPES) == 16 and "OTHER" in RELATION_TYPES
+    assert len(RELATION_TYPES) == 21 and "OTHER" in RELATION_TYPES
+    assert {"WARNS", "REJECTS", "PRESSURES", "MEDIATES", "REPORTS"} <= RELATION_TYPES
 
 
 def test_unknown_relation_type_becomes_other():

@@ -56,8 +56,12 @@ def _dedupe(items: list[str]) -> list[str]:
     return out
 
 
+BODY_CAP = 5  # a keyword repeated 60 times in a long article counts as 5: length must not win
+
+
 def score_document(doc: Doc, keywords: list[str], title_weight: float = 3.0) -> float:
-    return sum(doc.title.count(k) * title_weight + doc.body.count(k) for k in keywords)
+    kws = [k for k in keywords if len(k) >= 2]  # one-char keywords ('美') match too much noise
+    return sum(doc.title.count(k) * title_weight + min(doc.body.count(k), BODY_CAP) for k in kws)
 
 
 def select_documents(

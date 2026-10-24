@@ -28,6 +28,11 @@ RELATION_TYPES = frozenset(
         "PARTICIPATES",
         "OCCURS_AT",
         "OTHER",
+        "WARNS",
+        "REJECTS",
+        "PRESSURES",
+        "MEDIATES",
+        "REPORTS",
     }
 )
 

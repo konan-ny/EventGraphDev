@@ -119,5 +119,10 @@ insert into onto_relation_type(id, name, src_class, dst_class, description) valu
   (13,'AGREES_WITH','ORG|COUNTRY','ORG|COUNTRY','합의'),
   (14,'PARTICIPATES','EVENT','*','참여'),
   (15,'OCCURS_AT','EVENT','LOCATION|COUNTRY','장소'),
-  (16,'OTHER','*','*','스키마 밖 관계(raw_label 보존)')
+  (16,'OTHER','*','*','스키마 밖 관계(raw_label 보존)'),
+  (17,'WARNS','*','*','경고·위협'),
+  (18,'REJECTS','*','*','반박·거부·항의'),
+  (19,'PRESSURES','*','*','압박·요구·촉구'),
+  (20,'MEDIATES','*','*','중재·주선'),
+  (21,'REPORTS','*','*','보도·발표·주장')
 on conflict do nothing;

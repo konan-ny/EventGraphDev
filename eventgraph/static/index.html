@@ -145,7 +145,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&l
 const csv = (s) => s.split(",").map(x => x.trim()).filter(Boolean);
 const api = async (p, opt) => { const r = await fetch(p, opt); if (!r.ok) { let d; try { d = (await r.json()).detail; } catch {} throw new Error(d || r.status); } return r.json(); };
 const fmt = (d) => d ? d.slice(5).replace("-", ".") : "날짜 미상";
-const REL = { MEMBER_OF:"소속", LEADS:"수장", REPRESENTS:"대표", MEETS:"회담", CRITICIZES:"비난", SUPPORTS:"지지", NEGOTIATES_WITH:"협상", ORDERS:"명령", SUCCEEDS:"후임", ALLIES_WITH:"협력", SANCTIONS:"제재", ATTACKS:"공격", AGREES_WITH:"합의", PARTICIPATES:"참여", OCCURS_AT:"장소" };
+const REL = { MEMBER_OF:"소속", LEADS:"수장", REPRESENTS:"대표", MEETS:"회담", CRITICIZES:"비난", SUPPORTS:"지지", NEGOTIATES_WITH:"협상", ORDERS:"명령", SUCCEEDS:"후임", ALLIES_WITH:"협력", SANCTIONS:"제재", ATTACKS:"공격", AGREES_WITH:"합의", PARTICIPATES:"참여", OCCURS_AT:"장소", WARNS:"경고", REJECTS:"반박", PRESSURES:"압박", MEDIATES:"중재", REPORTS:"보도" };
 const TYPE = { PERSON:"인물", ORG:"기관", COUNTRY:"국가", LOCATION:"지역" };
 const COLOR = { PERSON:"#2E5E9E", ORG:"#7C5CBF", COUNTRY:"#2F8F6B", LOCATION:"#B7791F" };
 const SHAPE = { PERSON:"ellipse", ORG:"round-rectangle", COUNTRY:"hexagon", LOCATION:"diamond" };

@@ -18,7 +18,13 @@ from .spark import get_spark, read_extracted
 log = logging.getLogger(__name__)
 
 JACCARD_MERGE = 0.5
-CLASS_ID = {"PERSON": 1, "ORG": 2, "LOCATION": 3, "COUNTRY": 4, "EVENT": 5}
+CLASS_ID = {
+    "PERSON": 1,
+    "ORG": 2,
+    "LOCATION": 3,
+    "COUNTRY": 4,
+    "EVENT": 5,
+}  # mirrors schema.sql seed
 
 _AFF = T.StructType(
     [T.StructField("target_temp_id", T.StringType()), T.StructField("role", T.StringType())]

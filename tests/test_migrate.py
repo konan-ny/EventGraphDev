@@ -7,7 +7,7 @@ from eventgraph.migrate import migrate
 def test_migrate_creates_tables_and_seed(settings, pg):
     migrate(settings)
     migrate(settings)  # idempotent
-    assert pg.execute("select count(*) from onto_relation_type").fetchone()[0] == 16
+    assert pg.execute("select count(*) from onto_relation_type").fetchone()[0] == 21
     assert pg.execute("select count(*) from onto_class").fetchone()[0] == 5
     row = pg.execute(
         "select to_regclass('relation'), to_regclass('evidence'), to_regclass('event_participant'), to_regclass('run_document')"
