@@ -1,0 +1,171 @@
+# 결정 기록
+
+| 번호 | 날짜 | 결정 | 상태 |
+|---|---|---|---|
+| D-01 | 2026-10-20 | 재사용 도구로 설계, 사건은 입력값 | 유효 |
+| D-02 | 2026-10-20 | 원천은 한국어 코퍼스(MySQL newsnaver), 수집 단계는 범위 밖 | 유효 |
+| D-03 | 2026-10-20 | 온톨로지는 PostgreSQL(RDB), 코퍼스 배치는 PySpark | 유효 |
+| D-04 | 2026-10-20 | 벡터 DB·LlamaIndex·Redis 보류 | 유효 |
+| D-05 | 2026-10-20 | 관계 유형 초기 16종, 클래스 제약은 참고용(교차 클래스 허용), 사건은 노드 아님 | 유효 |
+| D-06 | 2026-10-20 | 기간 필터는 간선 근거 날짜 기준, 서버 처리 | 유효 |
+| D-07 | 2026-10-20 | 골든 세트 첫 사건 = 호르무즈, 정답 초안 Claude·교정 사용자 | 유효 |
+| D-08 | 2026-10-21 | 추출 모델 `claude-haiku-5-5`, effort=low | 유효 |
+| D-09 | 2026-10-21 | 추출은 구조화 출력(json_schema)으로 | 유효 |
+| D-10 | 2026-10-21 | 키워드 확장: max_tokens 2048, 따옴표 문자열 파싱 | 유효 |
+| D-11 | 2026-10-21 | Windows 로컬 Spark 설정(local[4], classpath jar, pyarrow 읽기, 127.0.0.1) | 유효 |
+| D-12 | 2026-10-21 | 배치 id는 Spark에서 부여(max(id)+row_number), 동시 run 1개 | 유효 |
+| D-13 | 2026-10-21 | PERSON 병합 규칙 A/B/C(별칭·단일토큰 접미·음역 변형) | 유효 |
+| D-14 | 2026-10-21 | golden_compare 별칭 매칭은 완전 일치 | 유효 |
+| D-15 | 2026-10-21 | 추출 0건 run은 실패로 처리 | 유효 |
+| D-16 | 2026-10-21 | 날짜 문자열은 관대하게(미해석 → null), 상대 날짜는 기사일 기준 해석 | 유효 |
+| D-17 | 2026-10-21 | 선별 점수 길이 정규화는 보류(재추출 비용) | 보류 |
+| D-18 | 2026-10-22 | UI 방향 B(분석 노트), 타임라인 하단 | 유효 |
+| D-19 | 2026-10-22 | "핵심 N" 필터는 브라우저에서 처리(API 파라미터 없음) | 유효 |
+| D-20 | 2026-10-24 | 로그는 `data/runs/log/`, 루트 README·BRIEF·DECISIONS 유지 | 유효 |
+
+## D-01 · 2026-10-20 · 재사용 도구로 설계, 사건은 입력값
+- 맥락: 처음 요청은 "러시아-우크라이나 전쟁" 분석이었으나, 사건 이름만 바꿔 다른 사건에도 돌릴 수 있어야 한다고 함
+- 고려한 선택지: A. 한 사건의 분석 결과물 1편 / B. 사건 비의존 파이프라인 ← 채택
+- 결정: 입력은 폼(사건 이름·기간·인물·기관·국가), 코드에 사건 고유 정보를 두지 않음
+- 근거: 사용자 결정
+- 영향: 설계 전체. 러-우 run이 코드 변경 없이 완료된 것으로 검증(docs/golden/ukraine/run_notes.md)
+- 다시 볼 조건: 없음
+- 관련: BRIEF Product Goal
+- 상태: 유효
+
+## D-02 · 2026-10-20 · 원천은 한국어 코퍼스(MySQL), 수집 단계는 범위 밖
+- 맥락: 처음엔 웹 검색 수집을 가정했으나 사용자가 "원천 데이터는 별도 인입"이라 함. 처음 받은 DB(globalnews, CN/JP/RU/EN)는 한국어가 없어 `portalnews.newsnaver`(30만 건)로 변경
+- 고려한 선택지: A. Anthropic 웹 검색 도구로 수집 / B. MySQL 코퍼스만 사용 ← 채택
+- 결정: `config/.env`의 DB_* 로 읽기 전용 접속. 본문 HTML 제거·불량 날짜·빈 본문 제외는 범위 안
+- 근거: 사용자 결정. 실측: 5월 글로벌 테이블은 한국어 0건
+- 영향: `eventgraph/source.py`. 언어 필드 없음 → 한국어 단일
+- 다시 볼 조건: 다국어 원문을 다룰 때
+- 상태: 유효
+
+## D-03 · 2026-10-20 · 온톨로지는 RDB, 코퍼스 배치는 PySpark
+- 맥락: 사용자 스택 희망(postgresql, spark, langgraph, qdrant/milvus, llamaindex, redis). 운영 시스템은 수백만 문서 예정
+- 고려한 선택지: A. Spark 없이 SQL+pandas / B. 코퍼스 단위 배치만 Spark, 문서 단위 LLM 호출은 asyncio ← 채택 / C. 전 단계 Spark
+- 결정: 정의 표(onto_class·onto_relation_type) + 인스턴스 표(run 단위)로 PostgreSQL. 병합·집계·적재는 `eventgraph/batch/job.py`
+- 근거: 사용자 결정(Spark 학습·규모 대비). LLM 호출은 API 레이트가 병목이라 Spark 이득 없음
+- 영향: Spark 로컬 모드 운영 제약(D-11)
+- 다시 볼 조건: 선별 단계가 수백만 건을 다룰 때 → Spark JDBC 읽기로 이전
+- 상태: 유효
+
+## D-04 · 2026-10-20 · 벡터 DB·LlamaIndex·Redis 보류
+- 맥락: 1차 범위에 RAG 질의응답과 작업 큐가 없음
+- 고려한 선택지: A. 처음부터 포함 / B. 필요가 실측될 때 추가 ← 채택
+- 결정: Qdrant/Milvus·LlamaIndex는 문서 질의응답 기능이 들어올 때, Redis는 큐·캐시 병목이 실측될 때
+- 근거: Claude 판단, 사용자 확인
+- 다시 볼 조건: 질의응답 요구, 동시 run 2개 이상 필요
+- 상태: 유효
+
+## D-05 · 2026-10-20 · 관계 유형 16종, 클래스 제약은 참고용, 사건은 노드 아님
+- 맥락: 빌더 검토에서 "젤렌스키(인물)→러시아(국가) 비난" 같은 교차 클래스 관계가 OTHER로 떨어질 위험 지적
+- 고려한 선택지: A. src/dst 클래스 강제 / B. 참고용, 조합별 건수만 로그 ← 채택
+- 결정: MEMBER_OF·LEADS·REPRESENTS·MEETS·CRITICIZES·SUPPORTS·NEGOTIATES_WITH·ORDERS·SUCCEEDS·ALLIES_WITH·SANCTIONS·ATTACKS·AGREES_WITH·PARTICIPATES·OCCURS_AT·OTHER. 사건은 event 표에만, 관계도 노드로 그리지 않음
+- 근거: Claude 판단. 실측: 호르무즈 OTHER 81%, 러-우 32%
+- 영향: `eventgraph/schema.sql`, `extract/models.py`
+- 다시 볼 조건: OTHER raw_label 상위(경고·반박·보도·압박·중재)로 유형 확장 시 → BRIEF Next 2
+- 상태: 유효
+
+## D-06 · 2026-10-20 · 기간 필터는 간선 근거 날짜 기준
+- 맥락: 계획 단계에서 `[date_min, date_max]` 겹침으로 완화했으나 최종 리뷰에서 스펙 4.3과 어긋남이 확인됨
+- 고려한 선택지: A. 범위 겹침 / B. 근거 문장 중 하나라도 기간 안(evidence_date, 없으면 기사일) ← 채택
+- 결정: `/runs/{id}/graph?from&to`는 evidence EXISTS 조건으로 필터
+- 근거: 리뷰 지적 I5, 스펙 원문. 테스트 `test_graph_period_filter_uses_evidence_dates_not_range_overlap`
+- 영향: `eventgraph/api.py`
+- 상태: 유효
+
+## D-07 · 2026-10-20 · 골든 세트 첫 사건 = 호르무즈, 정답 초안 Claude·교정 사용자
+- 맥락: 코퍼스(2026-06~07)에서 제목 기준 이란/호르무즈 3,167건, 러-우 1,487건, 베네수엘라 강진 956건(관계 빈약)
+- 고려한 선택지: A. 러-우 / B. 호르무즈 ← 채택 / C. 베네수엘라
+- 결정: 선별 상위 20건을 골든 세트로, 두 번째 사건은 러-우로 재사용성 확인
+- 근거: 사용자 결정("골라서 제안" 후 승인). 인물·국가·기관 혼재와 날짜 밀도
+- 영향: docs/golden/hormuz/
+- 다시 볼 조건: 교정 완료 시 기준선 재산출
+- 상태: 유효
+
+## D-08 · 2026-10-21 · 추출 모델 claude-haiku-5-5, effort=low
+- 맥락: Models API 실측으로 `claude-haiku-5-5` 존재 확인. 실 추출 1건 3.8k/1.5k 토큰, 8.6초
+- 고려한 선택지: A. Sonnet 5.5 / B. Haiku 5.5 ← 채택
+- 결정: `ANTHROPIC_MODEL` 기본값, 설정으로 교체 가능
+- 근거: 사용자 결정. 비용: 300건당 입력 1.4~1.7M 토큰
+- 다시 볼 조건: 골든 세트 재현율이 목표 미달이면 effort=medium 1회 비교(≈$5)
+- 상태: 유효
+
+## D-09 · 2026-10-21 · 추출은 구조화 출력(json_schema)
+- 맥락: 자유 JSON 첫 실 호출에서 `"src_temp_id":data_placeholder` 같은 잘못된 토큰이 섞여 파싱 실패
+- 고려한 선택지: A. 텍스트 JSON + 복구 파싱 / B. `output_config.format=json_schema`(엄격 스키마) ← 채택
+- 결정: `extract/models.py OUTPUT_SCHEMA`, 응답은 end_turn만 허용
+- 근거: 재호출 결과 실패 0건(300건×2 run)
+- 영향: `extract/client.py`
+- 상태: 유효
+
+## D-10 · 2026-10-21 · 키워드 확장: max_tokens 2048, 따옴표 문자열 파싱
+- 맥락: 512 토큰에서는 Haiku 5.5의 사고 토큰이 예산을 다 써 배열이 잘림
+- 결정: max_tokens 2048, effort low, `"…"` 문자열을 모두 추출(잘린 배열도 앞부분은 살림)
+- 근거: 실측 21개 키워드 생성
+- 다시 볼 조건: 다단어 키워드가 선별 점수에 과소 반영되면
+- 상태: 유효
+
+## D-11 · 2026-10-21 · Windows 로컬 Spark 설정
+- 맥락: `spark.jars.packages`는 winutils 필요, `spark.read.parquet`는 Hadoop NativeIO 필요, `local[*]`(20코어)는 파이썬 워커 핸드셰이크 15초 초과로 크래시, 호스트명이 host.docker.internal로 바인딩
+- 결정: JDBC jar는 `lib/`에 받아 driver classpath로, Windows에서 Parquet은 pyarrow로 읽어 createDataFrame, master `local[4]`, driver.host 127.0.0.1, PYSPARK_PYTHON=driver 인터프리터
+- 근거: 각 항목 프로브로 실측(`.superpowers/sdd` 레저, 현재 삭제됨)
+- 영향: `eventgraph/batch/spark.py` 한 곳
+- 다시 볼 조건: 클러스터 전환 또는 HADOOP_HOME 설치
+- 상태: 유효
+
+## D-12 · 2026-10-21 · 배치 id는 Spark에서 부여, 동시 run 1개
+- 맥락: JDBC로 쓴 뒤 되읽어 id를 얻는 방식은 왕복이 많음
+- 결정: `max(id)+row_number`로 id 부여, 적재 후 시퀀스 setval. API는 advisory lock으로 run 생성 직렬화, 서버 시작 시 진행 중 run을 failed로
+- 근거: 리뷰 I4로 레이스 방지 보강
+- 다시 볼 조건: 동시 run 허용이 필요해지면 id 부여 방식 재설계
+- 상태: 유효
+
+## D-13 · 2026-10-21 · PERSON 병합 규칙 A/B/C
+- 맥락: 골든 세트 쪼개짐 6건이 전부 음역 변형(마르코/마코 루비오, 재러드/제러드 쿠슈너, 알 부사이디/알부사이디) 또는 단일 토큰 성(갈리바프)
+- 결정: A 별칭 일치 → B 단일 토큰 성이 유일한 긴 이름(정규화 후)으로 수렴할 때 병합 → C 성 동일·이름 토큰 편집거리 ≤1. 다중 토큰끼리는 성만 같으면 병합 안 함(알리/모즈타바 하메네이). 대표 이름은 가장 짧은 표기(결정적), 직함 토큰 제거
+- 근거: 재측정 쪼개짐 6→0, 잘못 합침 2→0
+- 영향: `batch/job.py canonical_keys`, `batch/normalize.py name_tokens`
+- 다시 볼 조건: 도널드/로널드 트럼프 같은 과병합 관측 시
+- 상태: 유효
+
+## D-14 · 2026-10-21 · golden_compare 별칭 매칭은 완전 일치
+- 맥락: 접미 매칭이 알리/모즈타바 하메네이를 "잘못 합침"으로 오판
+- 결정: name_ko는 단일 토큰 성 매칭 허용, surface_forms는 정규화 키 완전 일치만
+- 영향: PERSON 재현율 수치 3p 하락(측정 기준 변화, 규칙 변화 아님)
+- 상태: 유효
+
+## D-15 · 2026-10-21 · 추출 0건 run은 실패로
+- 맥락: 리뷰 C1 — 키 만료 등으로 300건 전부 실패해도 빈 그래프가 done으로 보임(스펙 반목표 4)
+- 결정: extracted==0이면 RuntimeError, status failed. UI 완료 문구에 실패 건수 표기
+- 상태: 유효
+
+## D-16 · 2026-10-21 · 날짜 문자열은 관대하게
+- 맥락: `"2026-06"` 같은 값 하나로 문서 전체가 실패(리뷰 I3)
+- 결정: 상대 표현은 기사일 기준 `resolve_date`로 해석, 해석 불가면 null
+- 상태: 유효
+
+## D-17 · 2026-10-21 · 선별 점수 길이 정규화 보류
+- 맥락: 상위 20건 중 3건(건국 250주년·외신 모음·AI 증시)이 무관. 점수가 등장 횟수 합이라 긴 기사·'미국' 다빈출에 편향
+- 결정: 재선별은 재추출 비용이 들어 온톨로지 확장(BRIEF Next 2)과 묶어 진행
+- 상태: 보류
+
+## D-18 · 2026-10-22 · UI 방향 B(분석 노트), 타임라인 하단
+- 맥락: 사용자 우선순위 "밋밋한 인상 → 노드 뭉침 → 근거 패널이 아래 숨음". 시안 A 상황실·B 분석 노트·C 지도 중 B, 왼쪽 패널을 하단으로
+- 결정: 회백색 `#EEF1F4`+청록 `#0F6E6E`, Noto Serif KR/IBM Plex Sans KR, 핵심 N(연결 수 상위 20) 기본·동심원 배치·라벨은 상위 28 간선만, 오른쪽 번호 각주, 하단 사건 축(드래그 구간)
+- 근거: 사용자 결정. 시안 docs/design/
+- 상태: 유효
+
+## D-19 · 2026-10-22 · "핵심 N" 필터는 브라우저에서
+- 맥락: 전체 그래프가 200노드·540간선 수준
+- 결정: API 파라미터 추가 없이 클라이언트에서 degree 상위 N 계산
+- 다시 볼 조건: 노드 수천 이상
+- 상태: 유효
+
+## D-20 · 2026-10-24 · 로그는 data/runs/log/, 루트 README·BRIEF·DECISIONS
+- 맥락: 전역 플레이북 원칙 10·11·13 신설
+- 결정: 실행 로그는 `data/runs/log/`, 루트에 README.md 하나, BRIEF(덮어쓰기)·DECISIONS(추가만) 유지
+- 다시 볼 조건: 없음
+- 상태: 유효
