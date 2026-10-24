@@ -51,6 +51,11 @@ def main() -> None:
     ap.add_argument("run_id")
     ap.add_argument("answers")
     ap.add_argument("--out", default=None)
+    ap.add_argument(
+        "--source-run",
+        default=None,
+        help="run the answers' run_document_ids belong to; answers are re-mapped to <run_id> by source article",
+    )
     a = ap.parse_args()
     s = load_settings()
     answers = [
@@ -62,6 +67,35 @@ def main() -> None:
     by_doc = {r["run_document_id"]: json.loads(r["extraction"]) for r in table}
 
     lines = [f"# 골든 세트 비교 — run `{a.run_id}`", ""]
+    if a.source_run:  # answers were written against another run: follow the article, not the row id
+        with pg_connect(s) as conn:
+            src = dict(
+                conn.execute(
+                    "select id, source_idx from run_document where run_id=%s", (a.source_run,)
+                ).fetchall()
+            )
+            dst = {
+                v: k
+                for k, v in conn.execute(
+                    "select id, source_idx from run_document where run_id=%s", (a.run_id,)
+                ).fetchall()
+            }
+        kept, dropped = [], []
+        for ans in answers:
+            new_id = dst.get(src.get(ans["run_document_id"]))
+            (kept if new_id else dropped).append(ans)
+            ans["run_document_id"] = new_id or ans["run_document_id"]
+        answers = kept
+        lines += [
+            f"- 정답 문서 {len(kept) + len(dropped)}건 중 이번 run에서 선별된 문서 {len(kept)}건 기준으로 측정."
+            + (
+                f" 선별 탈락 {len(dropped)}건: "
+                + ", ".join(str(src.get(d["run_document_id"])) for d in dropped)
+                if dropped
+                else ""
+            ),
+            "",
+        ]
     hit = defaultdict(int)
     tot = defaultdict(int)
     rel_hit = rel_tot = 0
